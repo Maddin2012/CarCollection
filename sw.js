@@ -2,7 +2,7 @@
    Seitenaufrufe: erst Netz, dann Cache  -> Updates kommen sofort an, offline geht es trotzdem.
    Übrige Dateien: erst Cache, Netz aktualisiert im Hintergrund.
    WICHTIG: bei jeder Änderung an index.html o. ä. CACHE hochzählen. */
-const CACHE = 'carcollection-v4';
+const CACHE = 'carcollection-v5';
 const ASSETS = [
   './',
   './index.html',

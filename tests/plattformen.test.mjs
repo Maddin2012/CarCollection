@@ -113,7 +113,7 @@ export default async function ({ browser, base, ok }) {
     await page.click('.panel .row [data-a="close"]');
 
     // --- Sicherung im Startbildschirm-Modus ---
-    await page.click('#back');
+    await page.goBack();
     await page.click('[data-a="backupOut"]');
     await page.waitForFunction(() => window.__shared.length > 2);
     shared = await page.evaluate(() => window.__shared);
@@ -144,7 +144,7 @@ export default async function ({ browser, base, ok }) {
     const [ics] = await Promise.all([page.waitForEvent('download'), page.click('[data-a="tuevIcs"]')]);
     ok(/\.ics$/.test(ics.suggestedFilename()), `Kalendereintrag wird heruntergeladen: ${ics.suggestedFilename()}`);
 
-    await page.click('#back');
+    await page.goBack();
     const [bak] = await Promise.all([page.waitForEvent('download'), page.click('[data-a="backupOut"]')]);
     ok(/\.json$/.test(bak.suggestedFilename()), `Sicherung wird heruntergeladen: ${bak.suggestedFilename()}`);
 

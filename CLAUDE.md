@@ -53,9 +53,19 @@ node --check sw.js
 node -e "JSON.parse(require('fs').readFileSync('manifest.webmanifest','utf8'))"
 ```
 
-Für Änderungen am Verhalten reicht das nicht. Dann die App in einem echten
-Browser gegen `python3 -m http.server` fahren und den betroffenen Ablauf
-wirklich durchklicken, statt ihn für richtig zu halten.
+Dazu die Browser-Tests — sie starten ihren eigenen Webserver, ein Aufruf genügt:
+
+```sh
+npm ci                       # einmalig
+npm test                     # 60 Prüfungen in drei Reihen
+```
+
+Läuft ein vorinstalliertes Chromium ausserhalb von Playwrights eigener Ablage,
+den Pfad über `CHROMIUM_PATH` mitgeben.
+
+Änderst du Verhalten, **erweitere die Tests** in `tests/` mit — ein Ablauf ohne
+Test ist beim nächsten Mal nicht mehr abgesichert. Schlägt ein Test fehl, erst
+klären, ob die App oder der Test falsch liegt, und das Ergebnis benennen.
 
 ## Arbeitsweise im Repository
 

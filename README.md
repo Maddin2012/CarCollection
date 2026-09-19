@@ -75,6 +75,29 @@ ohne Bilder wäre nur eine halbe Sicherung.
 Das ist zugleich der einzige Weg, die Akte von einem Gerät auf ein anderes zu
 bringen, denn es gibt keine Synchronisation.
 
+## Tests
+
+```sh
+npm ci      # einmalig
+npm test
+```
+
+Die Tests starten einen eigenen Webserver und fahren ein echtes Chromium gegen
+die App — 60 Prüfungen in drei Reihen:
+
+| Reihe | Prüft |
+| --- | --- |
+| `grundfunktionen` | Speicherung in IndexedDB, Überleben von Neuladen und neuem Tab, Manifest, Icons, Service Worker, Offline-Betrieb |
+| `sicherung` | Export, vollständiges Leeren des Speichers, Wiedereinlesen samt Bildern, Zusammenführen ohne Duplikate, Abweisen fremder Dateien |
+| `plattformen` | beide Plattform-Pfade, indem Safaris Eigenheiten im Chromium nachgestellt werden |
+
+Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
+ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter
+erwartungsgemäß verhält.
+
+Steht ein vorinstalliertes Chromium ausserhalb von Playwrights eigener Ablage,
+den Pfad mitgeben: `CHROMIUM_PATH=/pfad/zu/chrome npm test`
+
 ## Lokal ausprobieren
 
 Die Datei direkt per Doppelklick zu öffnen (`file://`) funktioniert, aber ohne
@@ -93,7 +116,8 @@ python3 -m http.server 8765
 | `manifest.webmanifest` | Name, Farben und Icons der installierbaren App |
 | `sw.js` | Service Worker für den Offline-Betrieb |
 | `icons/` | App-Icons (192, 512 und Apple-Touch-Icon) |
-| `.github/workflows/checks.yml` | prüft bei jedem Pull Request Syntax und Dateien |
+| `tests/` | Browser-Tests, die die App wirklich bedienen |
+| `.github/workflows/checks.yml` | prüft bei jedem Pull Request Syntax, Dateien und Verhalten |
 
 ### Nach jeder Änderung an der App
 

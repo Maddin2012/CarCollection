@@ -149,6 +149,16 @@ input.upper{text-transform:uppercase}
 .note{margin:14px 2px 0;color:var(--muted);font-size:12px;text-align:center}
 .note.warn{color:var(--warn)}
 
+/* Dokumente am Logbuch-Eintrag */
+.dlist{margin-top:6px}
+.dlist .d{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:8px 10px;margin-top:6px}
+.dlist .d .ic{flex:none;width:30px;height:30px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:10px;font-weight:700;color:var(--accent)}
+.dlist .d .n{flex:1;min-width:0;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dlist .d .n small{display:block;color:var(--muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dlist .d button{flex:none;background:none;border:0;color:var(--muted);padding:5px 6px;line-height:0}
+.dlist .d button svg{display:block;width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.dhint{color:var(--muted);font-size:12px;margin:8px 2px 0}
+
 /* Einstellungen */
 .sect{border:1px solid var(--line);background:var(--surface);border-radius:16px;padding:14px 16px 16px;margin-bottom:14px}
 .sect h2{margin:0;font-family:var(--font);font-size:19px}
@@ -180,7 +190,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='6';
+const APP_VERSION='7';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='';
@@ -504,12 +514,14 @@ function viewLog(){
   const list=S.logs.filter(l=>logFilter==='Alle'||l.type===logFilter).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const sum=list.reduce((a,l)=>a+Number(l.cost||0),0);
   return `<div class="chips">${chips}</div>`+
-  (list.length?`<div class="sum"><span>${list.length} Einträge</span><b>${eur(sum)}</b></div>`+list.map(l=>`
+  (list.length?`<div class="sum"><span>${list.length} Einträge</span><b>${eur(sum)}</b></div>`+list.map(l=>{
+    const n=docsOf(l.id).length;
+    return `
     <button class="item" data-a="editLog" data-id="${l.id}">
       <div class="ico">${esc(l.type.slice(0,3))}</div>
-      <div class="mid"><div class="t">${esc(l.title)}</div><div class="s">${dt(l.date)} · ${esc(l.category)}${l.km?' · '+km(l.km):''}</div></div>
+      <div class="mid"><div class="t">${esc(l.title)}</div><div class="s">${dt(l.date)} · ${esc(l.category)}${l.km?' · '+km(l.km):''}${n?' · '+n+(n===1?' Dokument':' Dokumente'):''}</div></div>
       <div class="r">${l.cost?eur(l.cost):''}</div>
-    </button>`).join('')
+    </button>`}).join('')
   :`<div class="empty"><b>Noch keine Einträge</b>Halte Reparaturen, Wartungen und Umbauten mit Datum, Kilometerstand und Kosten fest.</div>`);
 }
 
@@ -524,7 +536,7 @@ function viewDoc(){
     list.filter(d=>d.category===g).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(d=>`
     <button class="item" data-a="openDoc" data-id="${d.id}">
       <div class="ico" data-thumb="${d.id}">${d.type==='pdf'?'PDF':'…'}</div>
-      <div class="mid"><div class="t">${esc(d.title)}</div><div class="s">${dt(d.date)||'Ohne Datum'}</div></div>
+      <div class="mid"><div class="t">${esc(d.title)}</div><div class="s">${dt(d.date)||'Ohne Datum'}${docBezug(d)}</div></div>
     </button>`).join('')).join('')
   :`<div class="empty"><b>Noch keine Dokumente</b>Scanne TÜV-Bericht, Fahrzeugschein oder Rechnungen ein und ordne sie einer Kategorie zu.</div>`);
 }
@@ -608,13 +620,43 @@ function openSheet(title,body,onSave,del){
   <div class="row">${del?'<button class="btn ghost danger" data-a="del">Löschen</button>':''}<button class="btn ghost" data-a="close">${onSave?'Abbrechen':'Schließen'}</button>${onSave?'<button class="btn primary" data-a="ok">Speichern</button>':''}</div></div>`;
   $('#sheet').classList.add('open');
 }
-const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=pendingDoc=null;};
+const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=pendingDoc=logDocs=null;};
 const vals=()=>{const o={};document.querySelectorAll('#sbody [name]').forEach(e=>o[e.name]=e.value.trim());return o;};
 const showErr=m=>{$('#err').textContent=m};
 const field=(label,name,val='',type='text',extra='')=>`<label>${label}</label><input name="${name}" type="${type}" value="${esc(val)}" ${extra}>`;
 const select=(label,name,arr,sel)=>`<label>${label}</label><select name="${name}">${opts(arr,sel)}</select>`;
 
 function bumpKm(k){ k=Number(k); if(k&&k>Number(S.v.km||0)) S.v.km=k; }
+
+/* ---------- Dokumente am Logbuch-Eintrag ----------
+   Ein Dokument steht immer nur an einer Stelle: in S.docs. Der Bezug zum
+   Logbuch-Eintrag ist das Feld logId. Damit gibt es nichts zu synchronisieren -
+   der Reiter Dokumente zeigt dieselben Sätze, nur anders sortiert.
+
+   Solange das Sheet offen ist, sammelt logDocs die noch nicht gespeicherten
+   Anhänge. Erst beim Speichern werden sie abgelegt; bricht man ab, bleibt
+   nichts zurück. */
+let logDocs=null;   // {logId, add:[{tmp,data,type,datei}], off:[docId]}
+
+const docsOf=id=>S.docs.filter(d=>d.logId===id);
+// Der Bezug zum Logbuch-Eintrag, sofern es ihn noch gibt. Ein verwaister
+// Verweis - etwa nach dem Zusammenführen einer Sicherung - bleibt unerwähnt.
+const docBezug=doc=>{
+  const l=doc.logId&&S.logs.find(x=>x.id===doc.logId);
+  return l?' · zu: '+esc(l.title):'';
+};
+
+function renderLogDocs(){
+  const box=$('#logDocs'); if(!box||!logDocs) return;
+  const zeile=(kuerzel,name,sub,id)=>`<div class="d"><div class="ic">${kuerzel}</div>
+    <div class="n">${esc(name)}<small>${esc(sub)}</small></div>
+    <button data-a="logDocOff" data-id="${id}" aria-label="Vom Eintrag lösen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button></div>`;
+  const alte=docsOf(logDocs.logId).filter(d=>!logDocs.off.includes(d.id))
+    .map(d=>zeile(d.type==='pdf'?'PDF':'BILD',d.title,d.category+(d.date?' · '+dt(d.date):''),d.id)).join('');
+  const neue=logDocs.add
+    .map(n=>zeile(n.type==='pdf'?'PDF':'BILD',n.datei,'neu · wird unter dem Titel des Eintrags abgelegt',n.tmp)).join('');
+  box.innerHTML=(alte+neue)||'<p class="dhint">Noch nichts angehängt.</p>';
+}
 
 /* ---------- Vollbildanzeige für Dokumente ---------- */
 let fullDoc=null;
@@ -624,7 +666,7 @@ function openFull(doc,data){
   const f=$('#full');
   f.innerHTML=`<div class="fbar">
       <button class="btn ghost ico" data-a="closeFull" aria-label="Schließen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button>
-      <div class="ft"><b>${esc(doc.title)}</b><span>${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}</span></div>
+      <div class="ft"><b>${esc(doc.title)}</b><span>${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}${docBezug(doc)}</span></div>
       <button class="btn ghost danger" data-a="delFull">Löschen</button>
     </div>
     <div class="fimg" data-a="closeFull"><img alt="${esc(doc.title)}" src="${data}"></div>`;
@@ -797,18 +839,63 @@ const A={
   editLog:d=>{
     const l=S.logs.find(x=>x.id===d.id)||{date:today(),type:'Reparatur',category:'Motor'};
     const isNew=!l.id;
+    // Die Kennung steht schon vor dem Speichern fest, damit die Anhänge sich
+    // darauf beziehen können. Gespeichert wird sie erst, wenn der Eintrag es wird.
+    const logId=l.id||uid();
     openSheet(isNew?'Neuer Eintrag':'Eintrag bearbeiten',
       field('Titel','title',l.title,'text','placeholder="z. B. Zahnriemen gewechselt"')+
       `<div class="two">${select('Art','type',LOGTYPES,l.type)}${select('Kategorie','category',PARTCATS,l.category)}</div>`+
       `<div class="two">${field('Datum','date',l.date,'date')}${field('Kilometerstand','km',l.km||'','number','inputmode="numeric"')}</div>`+
       field('Kosten (€)','cost',l.cost||'','number','inputmode="decimal" step="0.01"')+
-      `<label>Notiz</label><textarea name="note">${esc(l.note)}</textarea>`,
+      `<label>Notiz</label><textarea name="note">${esc(l.note)}</textarea>`+
+      `<label>Dokumente</label>
+       <div class="filebox"><button class="btn" data-a="pickCam">Scannen</button><button class="btn" data-a="pickFile">Datei wählen</button></div>
+       <input type="file" id="fCam" accept="image/*" capture="environment" hidden>
+       <input type="file" id="fPick" accept="image/*,application/pdf" hidden>
+       <div class="dlist" id="logDocs"></div>
+       <p class="dhint">Angehängte Dokumente stehen auch im Reiter Dokumente – sie liegen dort und nicht doppelt. Das × löst sie nur von diesem Eintrag; gelöscht werden sie im Reiter Dokumente.</p>`,
       async()=>{
         const o=vals(); if(!o.title) return showErr('Bitte einen Titel eintragen.');
-        if(isNew) S.logs.push({id:uid(),...o}); else Object.assign(l,o);
+        // Erst die Bilder ablegen: Scheitert das, ist am Eintrag noch nichts
+        // geändert. Was in diesem Durchgang schon geschrieben wurde, räumen wir
+        // wieder weg, damit keine verwaisten Bilder zurückbleiben.
+        const geschrieben=[];
+        for(const n of logDocs.add){
+          const did=uid();
+          if(!await store.set('img:'+did,n.data)){
+            for(const w of geschrieben){ await store.del('img:'+w); delete IMG['img:'+w]; }
+            return showErr('Ein Dokument ließ sich nicht speichern. Die Datei ist evtl. zu groß.');
+          }
+          IMG['img:'+did]=n.data; n.docId=did; geschrieben.push(did);
+        }
+        if(isNew) S.logs.push({id:logId,...o}); else Object.assign(l,o);
+        // Durchnummeriert wird nur, wenn am Eintrag mehr als ein Dokument hängt.
+        const vorhanden=docsOf(logId).filter(x=>!logDocs.off.includes(x.id)).length;
+        const mehrere=logDocs.add.length+vorhanden>1;
+        logDocs.add.forEach((n,i)=>S.docs.push({
+          id:n.docId, type:n.type, logId,
+          title:o.title+(mehrere?' ('+(vorhanden+i+1)+')':''),
+          category:'Rechnungen', date:o.date||today(), note:''
+        }));
+        // Gelöste Dokumente verlieren nur den Bezug, nicht ihr Dasein.
+        for(const id of logDocs.off){ const doc=S.docs.find(x=>x.id===id); if(doc) delete doc.logId; }
         bumpKm(o.km); await save(); dismissModal();
       },
-      isNew?null:async()=>{S.logs=S.logs.filter(x=>x.id!==l.id);await save();dismissModal();});
+      isNew?null:async()=>{
+        // Der Eintrag geht, seine Dokumente bleiben: Eine Rechnung ist auch
+        // ohne den Eintrag noch etwas wert.
+        for(const doc of docsOf(l.id)) delete doc.logId;
+        S.logs=S.logs.filter(x=>x.id!==l.id); await save(); dismissModal();
+      });
+    logDocs={logId,add:[],off:[]};
+    renderLogDocs();
+  },
+  logDocOff:(d)=>{
+    if(!logDocs) return;
+    const vorher=logDocs.add.length;
+    logDocs.add=logDocs.add.filter(n=>n.tmp!==d.id);
+    if(logDocs.add.length===vorher&&!logDocs.off.includes(d.id)) logDocs.off.push(d.id);
+    renderLogDocs();
   },
 
   addPart:()=>A.editPart({}),
@@ -857,7 +944,7 @@ const A={
     const view=!data?'<p class="meta">Datei nicht gefunden.</p>'
       :'<button class="btn primary" style="display:block;width:100%" data-a="savePdf">PDF öffnen oder sichern</button>';
     pendingDoc=(data&&doc.type==='pdf')?{name:doc.title.replace(/[^\w -]+/g,'_')+'.pdf',data}:null;
-    openSheet(doc.title,`<div class="viewer"><div class="meta">${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}</div>${view}</div>`,null,
+    openSheet(doc.title,`<div class="viewer"><div class="meta">${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}${docBezug(doc)}</div>${view}</div>`,null,
       async()=>{await removeDoc(doc);dismissModal();});
   },
   closeFull:()=>dismissModal(),
@@ -911,9 +998,21 @@ document.addEventListener('change',async e=>{
     }catch(err){ alert(err.message||'Die Datei konnte nicht gelesen werden.') }
   }
   if((t.id==='fCam'||t.id==='fPick')&&t.files[0]){
-    try{pending=await fileToData(t.files[0],1600); $('#fname').textContent='Ausgewählt: '+t.files[0].name; showErr('');
-      const ti=document.querySelector('#sbody [name=title]'); if(ti&&!ti.value) ti.value=t.files[0].name.replace(/\.[^.]+$/,'');}
-    catch(err){showErr(err.message)}
+    const datei=t.files[0];
+    // Zurücksetzen, sonst meldet sich dieselbe Datei beim zweiten Mal nicht.
+    t.value='';
+    try{
+      const r=await fileToData(datei,1600);
+      if(logDocs){
+        // Logbuch-Maske: mehrere Anhänge, gespeichert wird erst beim Speichern.
+        logDocs.add.push({tmp:uid(),data:r.data,type:r.type,datei:datei.name});
+        renderLogDocs(); showErr('');
+      }else{
+        pending=r; $('#fname').textContent='Ausgewählt: '+datei.name; showErr('');
+        const ti=document.querySelector('#sbody [name=title]');
+        if(ti&&!ti.value) ti.value=datei.name.replace(/\.[^.]+$/,'');
+      }
+    }catch(err){showErr(err.message)}
   }
 });
 

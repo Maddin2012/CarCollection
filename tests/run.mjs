@@ -6,8 +6,9 @@ import * as sicherung from './sicherung.test.mjs';
 import * as plattformen from './plattformen.test.mjs';
 import * as navigation from './navigation.test.mjs';
 import * as einstellungen from './einstellungen.test.mjs';
+import * as logdokumente from './logdokumente.test.mjs';
 
-const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen];
+const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente];
 
 const { base, close } = await serve();
 const browser = await launch();

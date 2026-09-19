@@ -27,7 +27,7 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
   und TSN sowie eine Kostenübersicht. Die übrigen Felder (Leistung, Hubraum,
   Kraftstoff) bleiben in der Bearbeiten-Maske erfassbar.
 - **Logbuch** – Reparaturen, Wartungen und Umbauten mit Datum, Kilometerstand,
-  Kategorie und Kosten.
+  Kategorie und Kosten. Belege lassen sich direkt am Eintrag anhängen.
 - **Dokumente** – Fahrzeugpapiere, TÜV-Berichte, Versicherung und Rechnungen als
   Foto (Kamera-Scan) oder PDF, nach Kategorie gruppiert.
 - **Teile** – gekaufte Teile mit Kategorie, Status (verbaut / auf Lager /
@@ -40,6 +40,30 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
 - **Einstellungen** – hinter dem Zahnrad oben rechts in der Garage: Sicherung
   speichern und einlesen, die laufende Fassung und die Update-Prüfung.
 - **Offline** – als Homescreen-App ohne Netz nutzbar.
+
+## Belege am Logbuch-Eintrag
+
+In der Maske eines Logbuch-Eintrags gibt es unten einen Bereich **Dokumente**
+mit denselben Knöpfen wie im Reiter Dokumente: *Scannen* oder *Datei wählen*,
+beliebig oft. Angehängt wird erst beim Speichern — brichst du ab, bleibt nichts
+zurück.
+
+Ein Dokument liegt dabei **nur an einer Stelle**, nämlich in der
+Dokumentenliste des Fahrzeugs; der Bezug zum Eintrag ist ein Feld daran. Es
+wird also nichts doppelt gespeichert und es gibt nichts abzugleichen: Dieselbe
+Rechnung erscheint am Eintrag und im Reiter Dokumente, dort mit dem Vermerk
+*zu: &lt;Titel des Eintrags&gt;*.
+
+Der Titel folgt dem Eintrag (bei mehreren durchnummeriert), das Datum ebenso,
+die Kategorie ist *Rechnungen*.
+
+Zwei Dinge sind bewusst so entschieden:
+
+- Das **×** in der Liste löst ein Dokument nur vom Eintrag. Gelöscht wird es im
+  Reiter Dokumente.
+- Löschst du einen **Logbuch-Eintrag**, bleiben seine Dokumente erhalten und
+  verlieren nur den Bezug. Eine Rechnung ist auch ohne den Eintrag noch etwas
+  wert.
 
 ## Speicherung
 

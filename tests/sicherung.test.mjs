@@ -1,6 +1,7 @@
 /* Sicherung: exportieren, Speicher leeren, wieder einlesen. */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { REPO, watchErrors } from './lib.mjs';
 
 export const name = 'Sicherung';
@@ -9,7 +10,14 @@ export default async function ({ browser, base, ok }) {
   const ctx = await browser.newContext({ acceptDownloads: true });
   const page = await ctx.newPage();
   const errors = [];
+  const dialoge = [];
+  // Das Einlesen schreibt asynchron in den Speicher und schließt erst danach
+  // das Sheet. Darauf zu warten ist das einzige verlässliche Ende-Signal -
+  // die Garage selbst steht oft schon vorher auf dem Schirm.
+  const eingelesen = () => page.waitForFunction(
+    () => !document.getElementById('sheet').classList.contains('open'), null, { timeout: 10000 });
   watchErrors(page, errors);
+  page.on('dialog', d => { dialoge.push(d.message()); d.dismiss(); });
   await page.goto(base, { waitUntil: 'networkidle' });
 
   // --- Fahrzeug, Logbuch-Eintrag und ein Dokument mit Bild anlegen ---
@@ -41,11 +49,11 @@ export default async function ({ browser, base, ok }) {
   await page.waitForSelector('[data-a="backupOut"]');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-a="backupOut"]')]);
   const file = await dl.path();
-  ok(/^fahrzeugakte-sicherung-\d{4}-\d{2}-\d{2}\.json$/.test(dl.suggestedFilename()),
+  ok(/^carcollection-sicherung-\d{4}-\d{2}-\d{2}\.json$/.test(dl.suggestedFilename()),
     `Dateiname: ${dl.suggestedFilename()}`);
 
   const backup = JSON.parse(readFileSync(file, 'utf8'));
-  ok(backup.app === 'fahrzeugakte' && backup.version === 1, 'Sicherung trägt Kennung und Version');
+  ok(backup.app === 'carcollection' && backup.version === 1, 'Sicherung trägt Kennung und Version');
   ok(backup.vehicles.length === 1, 'Ein Fahrzeug in der Sicherung');
   ok(backup.vehicles[0].logs.length === 1 && backup.vehicles[0].docs.length === 1, 'Logbuch und Dokument enthalten');
   const imgKeys = Object.keys(backup.images);
@@ -70,6 +78,7 @@ export default async function ({ browser, base, ok }) {
   await page.click('[data-a="restoreReplace"]');
   ok((await page.textContent('[data-a="restoreReplace"]')) === 'Wirklich alles ersetzen?', 'Ersetzen fragt einmal nach');
   await page.click('[data-a="restoreReplace"]');
+  await eingelesen();
   await page.waitForSelector('.mini');
   ok((await page.textContent('.mini .mh b')) === 'VW Golf', 'Fahrzeug ist wiederhergestellt');
 
@@ -89,15 +98,27 @@ export default async function ({ browser, base, ok }) {
   await page.setInputFiles('#backupIn', file);
   await page.waitForSelector('[data-a="restoreMerge"]');
   await page.click('[data-a="restoreMerge"]');
-  await page.waitForSelector('.mini');
+  await eingelesen();
   ok((await page.locator('.mini').count()) === 1, 'Zusammenführen legt kein Duplikat an');
 
+  // --- Sicherung aus der Zeit vor der Umbenennung bleibt lesbar ---
+  const alt = JSON.parse(readFileSync(file, 'utf8'));
+  alt.app = 'fahrzeugakte';
+  const altPfad = join(tmpdir(), 'alte-sicherung.json');
+  writeFileSync(altPfad, JSON.stringify(alt));
+  await page.setInputFiles('#backupIn', altPfad);
+  await page.waitForSelector('[data-a="restoreMerge"]', { timeout: 5000 }).catch(() => {});
+  const angenommen = await page.locator('[data-a="restoreMerge"]').count() === 1;
+  ok(angenommen, `Sicherung mit alter Kennung "fahrzeugakte" wird angenommen${angenommen ? '' : ' - Dialoge: ' + JSON.stringify(dialoge)}`);
+  if (angenommen) await page.click('.panel .row [data-a="close"]');
+  await eingelesen();
+
   // --- Fremde Datei wird abgewiesen ---
-  let alerted = null;
-  page.on('dialog', d => { alerted = d.message(); d.dismiss(); });
+  const vorher = dialoge.length;
   await page.setInputFiles('#backupIn', join(REPO, 'manifest.webmanifest'));
   await page.waitForTimeout(400);
-  ok(alerted !== null && alerted.includes('keine Sicherung'), 'Fremde JSON-Datei wird abgewiesen');
+  ok(dialoge.length > vorher && dialoge[dialoge.length - 1].includes('keine Sicherung'),
+    'Fremde JSON-Datei wird abgewiesen');
 
   ok(errors.length === 0, `Keine JS-Fehler${errors.length ? ': ' + errors.join(' | ') : ''}`);
   await ctx.close();

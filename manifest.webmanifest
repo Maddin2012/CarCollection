@@ -1,6 +1,6 @@
 {
-  "name": "Fahrzeugakte",
-  "short_name": "Fahrzeugakte",
+  "name": "CarCollection",
+  "short_name": "CarCollection",
   "description": "Garage, Logbuch, Dokumente und Teile für deine Fahrzeuge – alle Daten bleiben auf deinem Gerät.",
   "lang": "de",
   "dir": "ltr",

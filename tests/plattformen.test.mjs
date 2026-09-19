@@ -37,7 +37,7 @@ const IOS_STANDALONE = () => {
 };
 
 export default async function ({ browser, base, ok }) {
-  const pdf = join(tmpdir(), 'fahrzeugakte-probe.pdf');
+  const pdf = join(tmpdir(), 'carcollection-probe.pdf');
   writeFileSync(pdf, '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n'
     + '2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n');
 
@@ -116,7 +116,7 @@ export default async function ({ browser, base, ok }) {
     await page.click('[data-a="backupOut"]');
     await page.waitForFunction(() => window.__shared.length > 2);
     shared = await page.evaluate(() => window.__shared);
-    ok(/^fahrzeugakte-sicherung-\d{4}-\d{2}-\d{2}\.json$/.test(shared[2][0].name),
+    ok(/^carcollection-sicherung-\d{4}-\d{2}-\d{2}\.json$/.test(shared[2][0].name),
       `Sicherung wird geteilt: ${shared[2][0].name}`);
     ok(shared[2][0].type === 'application/json', 'Sicherung hat den richtigen Typ');
 

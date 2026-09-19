@@ -14,7 +14,8 @@ Daraus folgen zwei Dinge:
 - Die Daten sind **nicht** zwischen Geräten synchronisiert. Was du auf dem Handy
   erfasst, steht nicht auf dem Laptop.
 - Es gibt **kein** automatisches Backup. Löschst du die Website-Daten im Browser
-  oder deinstallierst die App vom Homescreen, sind die Einträge weg.
+  oder deinstallierst die App vom Homescreen, sind die Einträge weg. Nutze
+  regelmäßig die Sicherung (siehe unten).
 
 Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
 
@@ -52,6 +53,27 @@ schnell sprengen. Bilder werden vor dem Speichern auf max. 1200 px (Titelbild)
 bzw. 1600 px (Dokumente) verkleinert und als JPEG abgelegt; PDFs sind auf
 3,5 MB begrenzt. Zusätzlich fragt die App per `navigator.storage.persist()` eine
 dauerhafte Ablage an, damit der Browser die Akte bei Platzmangel nicht räumt.
+
+## Sicherung
+
+In der Garage liegen unten zwei Schaltflächen:
+
+- **Sicherung speichern** – schreibt die komplette Akte in eine Datei
+  `fahrzeugakte-sicherung-JJJJ-MM-TT.json`. Darin stecken alle Fahrzeuge,
+  Logbuch-Einträge, Teile, Dokumente **und** die Bilder selbst (als Data-URL
+  eingebettet). Die Datei ist damit alles, was du zum Wiederherstellen brauchst.
+- **Sicherung einlesen** – zeigt erst, was in der Datei steckt, und fragt dann:
+  - *Zusammenführen* behält die vorhandenen Fahrzeuge und überschreibt nur die,
+    deren Kennung auch in der Sicherung vorkommt. Es entstehen keine Duplikate.
+  - *Alles ersetzen* verwirft zuerst die gesamte Garage. Diese Schaltfläche
+    fragt zur Sicherheit ein zweites Mal nach.
+
+Weil die Bilder mitgeschrieben werden, kann die Datei groß werden — bei vielen
+eingescannten Dokumenten schnell etliche MB. Das ist gewollt: eine Sicherung
+ohne Bilder wäre nur eine halbe Sicherung.
+
+Das ist zugleich der einzige Weg, die Akte von einem Gerät auf ein anderes zu
+bringen, denn es gibt keine Synchronisation.
 
 ## Lokal ausprobieren
 

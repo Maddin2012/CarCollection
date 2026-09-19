@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10151F">
+<title>Fahrzeugakte</title>
+<style>
+:root{
+  --bg:#10151F; --surface:#171E2B; --surface2:#1F2837; --line:#2C3649;
+  --text:#E9EDF5; --muted:#8C97AE; --accent:#6EC6E0; --accent-ink:#08222B;
+  --foil1:#EBDCA9; --foil2:#8C7838; --ok:#6CCB9C; --warn:#E8C25E; --danger:#E5766D;
+  --font:"Bahnschrift","DIN Alternate","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.45}
+body{min-height:100vh;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:calc(12px + env(safe-area-inset-top)) 18px 12px;background:linear-gradient(var(--bg) 78%,transparent)}
+.top h1{margin:0;font-family:var(--font);font-size:22px;font-weight:700;letter-spacing:.02em}
+.top small{display:block;color:var(--muted);font-size:12px;margin-top:-2px}
+.btn{border:1px solid var(--line);background:var(--surface2);padding:9px 14px;border-radius:12px;font-weight:600;font-size:14px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger);border-color:transparent}
+.tl{display:flex;align-items:center;gap:10px}
+.back{padding:8px 12px;font-size:18px;line-height:1}
+.actions{flex-wrap:wrap}
+.actions .wide{flex:1 1 100%}
+button.card{display:block;width:100%;border:0;text-align:left;color:inherit;cursor:pointer}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.mini .photo{aspect-ratio:4/3}
+.mini .plate{font-size:11px;left:8px;top:8px;padding:2px 8px 2px 17px;background-size:8px 100%}
+.mini .mh{padding:0 12px;margin-top:-22px;position:relative;z-index:3}
+.mini .mh b{display:block;font-family:var(--font);font-size:18px;line-height:1.1}
+.mini .mh span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.mini .ms{padding:8px 12px 12px;font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:6px}
+.mini .ms .pill{margin:0}
+.add{border:1.5px dashed var(--line);border-radius:22px;background:transparent;color:var(--muted);min-height:190px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:14px}
+.add b{font-family:var(--font);font-size:34px;color:var(--accent);line-height:1}
+.alert{margin-bottom:16px;border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:14px;background:var(--surface);overflow:hidden}
+.alert button{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:11px 14px;font-size:14px}
+.alert button:first-child{border-top:0}
+.alert .danger{color:var(--danger)} .alert .warn{color:var(--warn)}
+.wrap{padding:4px 16px 24px;max-width:560px;margin:0 auto}
+
+/* Karte */
+.card{padding:2px;border-radius:22px;background:linear-gradient(135deg,var(--foil1),var(--foil2) 28%,#F3E7BC 52%,#7A6731 78%,#E4D198);box-shadow:0 18px 40px rgba(0,0,0,.45)}
+.card-in{border-radius:20px;overflow:hidden;background:linear-gradient(180deg,#1A2231,#131A26)}
+.photo{position:relative;aspect-ratio:16/10;background:var(--surface2) center/cover no-repeat;display:flex;align-items:center;justify-content:center}
+.photo::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 55%,rgba(19,26,38,.95))}
+.photo .ph{position:relative;z-index:1;color:var(--muted);text-align:center;font-size:13px}
+.plate{position:absolute;z-index:2;left:12px;top:12px;background:#F2F4F8;color:#111;font-family:var(--font);font-weight:700;letter-spacing:.08em;padding:3px 10px 3px 20px;border-radius:6px;font-size:14px;border:1.5px solid #111;background-image:linear-gradient(#1D4FA3,#1D4FA3);background-size:10px 100%;background-repeat:no-repeat}
+.photo .edit{position:absolute;z-index:2;right:10px;top:10px;background:rgba(16,21,31,.72);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:6px 10px;font-size:12px;color:var(--text)}
+.head{padding:0 18px;margin-top:-34px;position:relative;z-index:3}
+.head h2{margin:0;font-family:var(--font);font-size:30px;line-height:1.05;font-weight:700}
+.head p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.stats{margin:16px 18px 0}
+.stat{display:flex;justify-content:space-between;align-items:baseline;padding:11px 0;border-top:1px solid var(--line)}
+.stat span{color:var(--muted);font-size:13px}
+.stat b{font-family:var(--font);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;font-family:var(--body);font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;margin-left:8px;vertical-align:middle;background:var(--surface2)}
+.pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.danger{color:var(--danger)}
+.foot{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);margin-top:6px;background:rgba(255,255,255,.02)}
+.foot div{padding:12px 6px;text-align:center;border-right:1px solid var(--line)}
+.foot div:last-child{border-right:0}
+.foot b{display:block;font-family:var(--font);font-size:18px}
+.foot span{font-size:11px;color:var(--muted)}
+.actions{display:flex;gap:10px;margin-top:16px}
+.actions .btn{flex:1}
+
+/* Listen */
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--muted);padding:6px 13px;border-radius:99px;font-size:13px}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.sum{display:flex;justify-content:space-between;align-items:baseline;padding:4px 2px 12px;color:var(--muted);font-size:13px}
+.sum b{font-family:var(--font);font-size:20px;color:var(--text)}
+.grp{margin:8px 2px 6px;display:flex;justify-content:space-between;color:var(--muted);font-size:13px;font-weight:600}
+.item{display:flex;gap:12px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:8px;align-items:center}
+.item .ico{flex:none;width:44px;height:44px;border-radius:10px;background:var(--surface2) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--accent);font-family:var(--font);font-size:12px;font-weight:700}
+.item .mid{flex:1;min-width:0}
+.item .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .s{color:var(--muted);font-size:12.5px}
+.item .r{text-align:right;font-family:var(--font);font-size:15px;white-space:nowrap}
+.item .r small{display:block;font-family:var(--body);color:var(--muted);font-size:11.5px}
+.empty{text-align:center;color:var(--muted);padding:44px 20px;border:1px dashed var(--line);border-radius:16px}
+.empty b{display:block;color:var(--text);margin-bottom:4px}
+
+/* Navigation */
+nav{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(23,30,43,.96);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+nav button{background:none;border:0;padding:6px 0;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:11.5px}
+nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--accent)}
+
+/* Sheet */
+#sheet{position:fixed;inset:0;z-index:20;display:none}
+#sheet.open{display:block}
+.scrim{position:absolute;inset:0;background:rgba(5,8,14,.66)}
+.panel{position:absolute;left:0;right:0;bottom:0;max-height:92vh;overflow:auto;background:var(--surface);border-radius:22px 22px 0 0;padding:10px 18px calc(18px + env(safe-area-inset-bottom));max-width:560px;margin:0 auto;animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.panel{animation:none}}
+.grab{width:40px;height:4px;border-radius:9px;background:var(--line);margin:0 auto 12px}
+.panel h2{margin:0 0 12px;font-family:var(--font);font-size:22px}
+label{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 4px}
+input,select,textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:11px;padding:11px 12px;font:inherit;font-size:16px}
+textarea{min-height:64px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+.err{color:var(--danger);font-size:13px;margin-top:10px;min-height:0}
+.viewer img{width:100%;border-radius:12px;background:var(--bg)}
+.viewer .meta{color:var(--muted);font-size:13px;margin:10px 0}
+.filebox{display:flex;gap:10px;margin-top:6px}
+.filebox .btn{flex:1}
+.fname{font-size:13px;color:var(--ok);margin-top:8px}
+.note{margin:14px 2px 0;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="tl"><button class="btn ghost back" id="back" data-a="garage" aria-label="Zur Garage" hidden>‹</button><div><h1 id="title">Fahrzeugakte</h1><small id="sub"></small></div></div>
+  <div id="topBtn"></div>
+</div>
+<div class="wrap" id="view"></div>
+<nav id="nav"></nav>
+<div id="sheet"></div>
+<input type="file" id="coverIn" accept="image/*" hidden>
+
+<script>
+const PARTCATS=['Motor','Getriebe','Fahrwerk','Bremsen','Reifen','Felgen','Elektrik','Karosserie','Innenraum','Ersatzteile','Sonstiges'];
+const DOCCATS=['Fahrzeugpapiere','TÜV / HU','Versicherung','Rechnungen',...PARTCATS];
+const LOGTYPES=['Reparatur','Wartung','Umbau','Sonstiges'];
+const STATUS=['Verbaut','Auf Lager','Bestellt'];
+
+const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:''},logs:[],parts:[],docs:[],cover:false});
+let S=null, VEH={}, IDX=[], view='garage';
+let tab='card', logFilter='Alle', partFilter='Alle';
+const IMG={}; let persistent=true; const mem={};
+
+/* ---------- Speicher ---------- */
+const store={
+  async get(k){
+    if(window.storage){ try{const r=await window.storage.get(k); return r?r.value:null;}catch(e){return null;} }
+    persistent=false; return mem[k]??null;
+  },
+  async set(k,v){
+    if(window.storage){ try{await window.storage.set(k,v);return true;}catch(e){return false;} }
+    persistent=false; mem[k]=v; return true;
+  },
+  async del(k){
+    if(window.storage){ try{await window.storage.delete(k);}catch(e){} } else delete mem[k];
+  }
+};
+const saveIndex=()=>store.set('akte:index',JSON.stringify({ids:IDX}));
+const save=async()=>{await store.set('akte:v:'+S.id,JSON.stringify(S));await saveIndex();};
+const coverKey=id=>'img:cover:'+id;
+async function loadImg(key){
+  if(IMG[key]) return IMG[key];
+  const d=await store.get(key); if(d) IMG[key]=d; return d;
+}
+
+/* ---------- Helfer ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const today=()=>new Date().toISOString().slice(0,10);
+const eur=n=>Number(n||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+const km=n=>Number(n||0).toLocaleString('de-DE')+' km';
+const dt=s=>{if(!s)return '';const [y,m,d]=s.split('-');return d?`${d}.${m}.${y}`:`${m}/${y}`};
+const opts=(arr,sel)=>arr.map(o=>`<option${o===sel?' selected':''}>${esc(o)}</option>`).join('');
+
+function fileToData(file,max){
+  return new Promise((res,rej)=>{
+    if(file.type==='application/pdf'){
+      if(file.size>3.5*1024*1024) return rej(new Error('Die PDF ist zu groß (maximal 3,5 MB).'));
+      const r=new FileReader(); r.onload=()=>res({data:r.result,type:'pdf'}); r.onerror=()=>rej(new Error('Datei konnte nicht gelesen werden.')); r.readAsDataURL(file);
+    }else{
+      const img=new Image(), url=URL.createObjectURL(file);
+      img.onload=()=>{
+        const s=Math.min(1,max/Math.max(img.width,img.height));
+        const c=document.createElement('canvas'); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
+        res({data:c.toDataURL('image/jpeg',.74),type:'image'});
+      };
+      img.onerror=()=>rej(new Error('Das Bild konnte nicht geladen werden.'));
+      img.src=url;
+    }
+  });
+}
+
+/* ---------- Icons ---------- */
+const ICONS={
+  card:'<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M4 13h16M8 17h4"/>',
+  log:'<path d="M14.5 6.5a4 4 0 0 0-5 5L4 17l3 3 5.5-5.5a4 4 0 0 0 5-5l-2.5 2.5-2-.5-.5-2z"/>',
+  doc:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
+  part:'<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>'
+};
+const TABS=[['card','Karte'],['log','Logbuch'],['doc','Dokumente'],['part','Teile']];
+
+/* ---------- Rendering ---------- */
+function render(){
+  if(view==='garage') return renderGarage();
+  $('#nav').style.display='grid'; $('#back').hidden=false;
+  $('#nav').innerHTML=TABS.map(([k,l])=>`<button data-a="tab" data-k="${k}" class="${tab===k?'on':''}"><svg viewBox="0 0 24 24">${ICONS[k]}</svg>${l}</button>`).join('');
+  const titles={card:'Fahrzeugakte',log:'Logbuch',doc:'Dokumente',part:'Teile'};
+  $('#title').textContent=titles[tab];
+  $('#sub').textContent=tab==='card'?'':(S.v.name||'');
+  $('#topBtn').innerHTML=tab==='card'?'':`<button class="btn primary" data-a="${{log:'addLog',doc:'addDoc',part:'addPart'}[tab]}">Hinzufügen</button>`;
+  $('#view').innerHTML=({card:viewCard,log:viewLog,doc:viewDoc,part:viewPart})[tab]()+
+    (persistent?'':'<p class="note">Hinweis: Speichern ist in dieser Umgebung nicht verfügbar. Daten gehen beim Schließen verloren.</p>');
+  hydrateImages();
+}
+
+function tuevInfo(v=S.v){
+  if(!v.tuev) return null;
+  const [y,m]=v.tuev.split('-').map(Number);
+  const end=new Date(y,m,0,23,59,59);
+  const days=Math.ceil((end-new Date())/864e5);
+  if(days<0) return {c:'danger',t:`seit ${-days} Tagen abgelaufen`,days};
+  if(days<=60) return {c:'warn',t:`noch ${days} Tage`,days};
+  return {c:'ok',t:'gültig',days};
+}
+
+function renderGarage(){
+  $('#nav').style.display='none'; $('#back').hidden=true;
+  $('#title').textContent='Garage'; $('#sub').textContent=IDX.length?IDX.length+(IDX.length===1?' Fahrzeug':' Fahrzeuge'):'';
+  $('#topBtn').innerHTML=IDX.length?'<button class="btn primary" data-a="addVehicle">Fahrzeug hinzufügen</button>':'';
+  const list=IDX.map(id=>VEH[id]);
+  const due=list.filter(x=>{const i=tuevInfo(x.v);return i&&i.c!=='ok'});
+  const banner=due.length?`<div class="alert" role="status">${due.map(x=>{const i=tuevInfo(x.v);return `<button data-a="open" data-id="${x.id}"><b>${esc(x.v.name||'Fahrzeug')}</b>: <span class="${i.c}">TÜV ${i.c==='danger'?'abgelaufen':'fällig'} (${i.t})</span></button>`}).join('')}</div>`:'';
+  const cards=list.map(x=>{
+    const i=tuevInfo(x.v);
+    return `<button class="card mini" data-a="open" data-id="${x.id}"><div class="card-in">
+      <div class="photo" data-cover="${x.id}">${x.v.plate?`<div class="plate">${esc(x.v.plate)}</div>`:''}${x.cover?'':'<div class="ph">Kein Bild</div>'}</div>
+      <div class="mh"><b>${esc(x.v.name||'Fahrzeug')}</b><span>${esc(x.v.variant)||'&nbsp;'}</span></div>
+      <div class="ms"><span>${x.v.km?km(x.v.km):'–'}</span>${i?`<span class="pill ${i.c}">TÜV ${dt(x.v.tuev)}</span>`:''}</div>
+    </div></button>`}).join('');
+  $('#view').innerHTML=list.length
+    ?banner+`<div class="grid">${cards}<button class="add" data-a="addVehicle"><b>+</b>Fahrzeug hinzufügen</button></div>`
+    :`<div class="empty"><b>Deine Garage ist leer</b>Lege dein erstes Fahrzeug an. Jedes bekommt eine eigene Karte.</div><div class="actions"><button class="btn primary" data-a="addVehicle">Erstes Fahrzeug anlegen</button></div>`;
+  (persistent||!IDX.length)||($('#view').insertAdjacentHTML('beforeend','<p class="note">Hinweis: Speichern ist in dieser Umgebung nicht verfügbar. Daten gehen beim Schließen verloren.</p>'));
+  hydrateImages();
+}
+
+function viewCard(){
+  const v=S.v, has=v.name;
+  const ti=tuevInfo();
+  const total=S.logs.reduce((a,l)=>a+Number(l.cost||0),0)+S.parts.reduce((a,p)=>a+Number(p.price||0),0);
+  const dash='–';
+  const rows=[
+    ['Kilometerstand',v.km?km(v.km):dash],
+    ['Leistung',v.power?v.power+' PS':dash],
+    ['Hubraum',v.displacement?Number(v.displacement).toLocaleString('de-DE')+' cm³':dash],
+    ['Baujahr',v.year||dash],
+    ['Kraftstoff',v.fuel||dash],
+    ['TÜV bis',v.tuev?dt(v.tuev)+(ti?`<span class="pill ${ti.c}">${ti.t}</span>`:''):dash]
+  ];
+  return `
+  <div class="card"><div class="card-in">
+    <div class="photo" id="coverBox" data-a="cover">
+      ${v.plate?`<div class="plate">${esc(v.plate)}</div>`:''}
+      ${S.cover?'':'<div class="ph">Titelbild hinzufügen</div>'}
+      <button class="edit" data-a="cover">${S.cover?'Bild ändern':'Foto wählen'}</button>
+    </div>
+    <div class="head"><h2>${has?esc(v.name):'Dein Fahrzeug'}</h2><p>${esc(v.variant)||(has?'':'Trage Marke, Modell und Daten ein.')}</p></div>
+    <div class="stats">${rows.map(r=>`<div class="stat"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('')}</div>
+    <div class="foot">
+      <div><b>${S.logs.length}</b><span>Einträge</span></div>
+      <div><b>${S.docs.length}</b><span>Dokumente</span></div>
+      <div><b>${S.parts.length}</b><span>Teile</span></div>
+      <div><b>${total?Math.round(total).toLocaleString('de-DE')+' €':dash}</b><span>Ausgaben</span></div>
+    </div>
+  </div></div>
+  <div class="actions">
+    <button class="btn" data-a="editVehicle">Fahrzeugdaten bearbeiten</button>
+    <button class="btn primary" data-a="updateKm">Kilometer aktualisieren</button>
+    ${v.tuev?'<button class="btn wide" data-a="tuevIcs">TÜV-Erinnerung im Kalender speichern</button>':''}
+  </div>`;
+}
+
+function viewLog(){
+  const chips=['Alle',...LOGTYPES].map(t=>`<button class="chip${logFilter===t?' on':''}" data-a="fLog" data-k="${t}">${t}</button>`).join('');
+  const list=S.logs.filter(l=>logFilter==='Alle'||l.type===logFilter).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const sum=list.reduce((a,l)=>a+Number(l.cost||0),0);
+  return `<div class="chips">${chips}</div>`+
+  (list.length?`<div class="sum"><span>${list.length} Einträge</span><b>${eur(sum)}</b></div>`+list.map(l=>`
+    <button class="item" data-a="editLog" data-id="${l.id}">
+      <div class="ico">${esc(l.type.slice(0,3))}</div>
+      <div class="mid"><div class="t">${esc(l.title)}</div><div class="s">${dt(l.date)} · ${esc(l.category)}${l.km?' · '+km(l.km):''}</div></div>
+      <div class="r">${l.cost?eur(l.cost):''}</div>
+    </button>`).join('')
+  :`<div class="empty"><b>Noch keine Einträge</b>Halte Reparaturen, Wartungen und Umbauten mit Datum, Kilometerstand und Kosten fest.</div>`);
+}
+
+function viewDoc(){
+  const cats=DOCCATS.filter(c=>S.docs.some(d=>d.category===c));
+  const f=window._df||'Alle';
+  const list=S.docs.filter(d=>f==='Alle'||d.category===f);
+  const groups=DOCCATS.filter(c=>list.some(d=>d.category===c));
+  const chipsHtml=['Alle',...cats].map(t=>`<button class="chip${f===t?' on':''}" data-a="fDoc" data-k="${t}">${t}</button>`).join('');
+  return (S.docs.length?`<div class="chips">${chipsHtml}</div>`:'')+
+  (list.length?groups.map(g=>`<div class="grp"><span>${g}</span><span>${list.filter(d=>d.category===g).length}</span></div>`+
+    list.filter(d=>d.category===g).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(d=>`
+    <button class="item" data-a="openDoc" data-id="${d.id}">
+      <div class="ico" data-thumb="${d.id}">${d.type==='pdf'?'PDF':'…'}</div>
+      <div class="mid"><div class="t">${esc(d.title)}</div><div class="s">${dt(d.date)||'Ohne Datum'}</div></div>
+    </button>`).join('')).join('')
+  :`<div class="empty"><b>Noch keine Dokumente</b>Scanne TÜV-Bericht, Fahrzeugschein oder Rechnungen ein und ordne sie einer Kategorie zu.</div>`);
+}
+
+function viewPart(){
+  const cats=PARTCATS.filter(c=>S.parts.some(p=>p.category===c));
+  const chips=['Alle',...cats].map(t=>`<button class="chip${partFilter===t?' on':''}" data-a="fPart" data-k="${t}">${t}</button>`).join('');
+  const list=S.parts.filter(p=>partFilter==='Alle'||p.category===partFilter);
+  const sum=list.reduce((a,p)=>a+Number(p.price||0),0);
+  const groups=PARTCATS.filter(c=>list.some(p=>p.category===c));
+  return (S.parts.length?`<div class="chips">${chips}</div><div class="sum"><span>${list.length} Teile</span><b>${eur(sum)}</b></div>`:'')+
+  (list.length?groups.map(g=>{
+    const items=list.filter(p=>p.category===g);
+    return `<div class="grp"><span>${g}</span><span>${eur(items.reduce((a,p)=>a+Number(p.price||0),0))}</span></div>`+
+    items.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(p=>`
+    <button class="item" data-a="editPart" data-id="${p.id}">
+      <div class="ico">${esc(p.status.slice(0,2))}</div>
+      <div class="mid"><div class="t">${esc(p.name)}</div><div class="s">${esc(p.status)}${p.date?' · '+dt(p.date):''}${p.vendor?' · '+esc(p.vendor):''}</div></div>
+      <div class="r">${p.price?eur(p.price):''}${p.partno?`<small>${esc(p.partno)}</small>`:''}</div>
+    </button>`).join('');
+  }).join('')
+  :`<div class="empty"><b>Noch keine Teile</b>Erfasse gekaufte Teile und ordne sie Motor, Reifen, Felgen, Fahrwerk oder Ersatzteilen zu.</div>`);
+}
+
+async function hydrateImages(){
+  if(view==='garage'){
+    for(const el of document.querySelectorAll('[data-cover]')){
+      const x=VEH[el.dataset.cover];
+      if(x&&x.cover){const d=await loadImg(coverKey(x.id)); if(d) el.style.backgroundImage=`url(${d})`;}
+    }
+    return;
+  }
+  if(tab==='card'&&S.cover){
+    const d=await loadImg(coverKey(S.id)); const b=$('#coverBox');
+    if(d&&b) b.style.backgroundImage=`url(${d})`;
+  }
+  if(tab==='doc'){
+    for(const el of document.querySelectorAll('[data-thumb]')){
+      const d=S.docs.find(x=>x.id===el.dataset.thumb);
+      if(d&&d.type==='image'){ const data=await loadImg('img:'+d.id); if(data){el.style.backgroundImage=`url(${data})`;el.textContent='';} }
+    }
+  }
+}
+
+/* ---------- Sheet ---------- */
+let sheetSave=null, sheetDel=null, pending=null;
+function openSheet(title,body,onSave,del){
+  sheetSave=onSave; sheetDel=del||null; pending=null;
+  $('#sheet').innerHTML=`<div class="scrim" data-a="close"></div><div class="panel" role="dialog" aria-label="${esc(title)}"><div class="grab"></div><h2>${esc(title)}</h2><div id="sbody">${body}</div><div class="err" id="err"></div>
+  <div class="row">${del?'<button class="btn ghost danger" data-a="del">Löschen</button>':''}<button class="btn ghost" data-a="close">${onSave?'Abbrechen':'Schließen'}</button>${onSave?'<button class="btn primary" data-a="ok">Speichern</button>':''}</div></div>`;
+  $('#sheet').classList.add('open');
+}
+const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=null;};
+const vals=()=>{const o={};document.querySelectorAll('#sbody [name]').forEach(e=>o[e.name]=e.value.trim());return o;};
+const showErr=m=>{$('#err').textContent=m};
+const field=(label,name,val='',type='text',extra='')=>`<label>${label}</label><input name="${name}" type="${type}" value="${esc(val)}" ${extra}>`;
+const select=(label,name,arr,sel)=>`<label>${label}</label><select name="${name}">${opts(arr,sel)}</select>`;
+
+function bumpKm(k){ k=Number(k); if(k&&k>Number(S.v.km||0)) S.v.km=k; }
+
+function vehicleSheet(isNew){
+  const v=isNew?newVeh().v:S.v;
+  openSheet(isNew?'Neues Fahrzeug':'Fahrzeugdaten',
+    field('Marke und Modell','name',v.name,'text','placeholder="z. B. VW Golf"')+
+    field('Variante','variant',v.variant,'text','placeholder="z. B. GTI Edition 35"')+
+    `<div class="two">${field('Kennzeichen','plate',v.plate)}${field('Baujahr','year',v.year,'number','inputmode="numeric"')}</div>`+
+    `<div class="two">${field('Leistung (PS)','power',v.power,'number','inputmode="numeric"')}${field('Hubraum (cm³)','displacement',v.displacement,'number','inputmode="numeric"')}</div>`+
+    `<div class="two">${field('Kraftstoff','fuel',v.fuel,'text','placeholder="Benzin, Diesel …"')}${field('Kilometerstand','km',v.km||'','number','inputmode="numeric"')}</div>`+
+    `<div class="two">${field('TÜV gültig bis','tuev',v.tuev,'month')}${field('FIN (optional)','vin',v.vin)}</div>`,
+    async()=>{
+      const o=vals(); if(!o.name) return showErr('Bitte Marke und Modell eintragen.');
+      if(isNew){const nv=newVeh(); nv.v={...nv.v,...o,km:Number(o.km||0)}; VEH[nv.id]=nv; IDX.push(nv.id); S=nv; view='vehicle'; tab='card';}
+      else S.v={...S.v,...o,km:Number(o.km||0)};
+      await save(); closeSheet(); render();
+    },
+    isNew?null:async()=>{
+      const id=S.id;
+      for(const d of S.docs){await store.del('img:'+d.id);delete IMG['img:'+d.id];}
+      await store.del(coverKey(id));delete IMG[coverKey(id)];await store.del('akte:v:'+id);
+      IDX=IDX.filter(x=>x!==id);delete VEH[id];S=null;view='garage';await saveIndex();closeSheet();render();
+    });
+}
+
+/* ---------- Aktionen ---------- */
+const A={
+  tab:d=>{tab=d.k;render();window.scrollTo(0,0)},
+  fLog:d=>{logFilter=d.k;render()},
+  fPart:d=>{partFilter=d.k;render()},
+  fDoc:d=>{window._df=d.k;render()},
+  close:closeSheet,
+  ok:()=>sheetSave&&sheetSave(),
+  del:(d,el)=>{
+    if(!el.dataset.armed){el.dataset.armed=1;el.textContent='Wirklich löschen?';return;}
+    sheetDel&&sheetDel();
+  },
+  cover:()=>$('#coverIn').click(),
+
+  garage:()=>{view='garage';render();window.scrollTo(0,0)},
+  open:d=>{S=VEH[d.id];view='vehicle';tab='card';logFilter=partFilter='Alle';window._df='Alle';render();window.scrollTo(0,0)},
+  addVehicle:()=>vehicleSheet(true),
+  editVehicle:()=>vehicleSheet(false),
+  tuevIcs:()=>{
+    if(!S.v.tuev) return;
+    const [y,m]=S.v.tuev.split('-').map(Number), p=n=>String(n).padStart(2,'0');
+    const last=new Date(y,m,0), nx=new Date(y,m,1);
+    const f=d=>`${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}`;
+    const name=(S.v.name||'Fahrzeug')+(S.v.plate?' ('+S.v.plate+')':'');
+    const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Fahrzeugakte//DE','BEGIN:VEVENT','UID:tuev-'+S.id+'-'+f(last)+'@fahrzeugakte',
+      'DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z','DTSTART;VALUE=DATE:'+f(last),'DTEND;VALUE=DATE:'+f(nx),
+      'SUMMARY:TÜV fällig: '+name,'DESCRIPTION:Die Hauptuntersuchung ist bis Ende des Monats gültig.',
+      'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:TÜV in 30 Tagen fällig','TRIGGER:-P30D','END:VALARM',
+      'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:TÜV in 7 Tagen fällig','TRIGGER:-P7D','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
+    const a=document.createElement('a');
+    a.href='data:text/calendar;charset=utf-8,'+encodeURIComponent(ics);
+    a.download='TUEV-'+(S.v.plate||S.v.name||'Fahrzeug').replace(/[^\w-]+/g,'_')+'.ics';
+    document.body.appendChild(a);a.click();a.remove();
+  },
+  updateKm:()=>{
+    openSheet('Kilometerstand',field('Aktueller Stand (km)','km',S.v.km||'','number','inputmode="numeric"'),
+      async()=>{const o=vals(); if(o.km==='') return showErr('Bitte einen Kilometerstand eintragen.'); S.v.km=Number(o.km); await save(); closeSheet(); render();});
+  },
+
+  addLog:()=>A.editLog({}),
+  editLog:d=>{
+    const l=S.logs.find(x=>x.id===d.id)||{date:today(),type:'Reparatur',category:'Motor'};
+    const isNew=!l.id;
+    openSheet(isNew?'Neuer Eintrag':'Eintrag bearbeiten',
+      field('Titel','title',l.title,'text','placeholder="z. B. Zahnriemen gewechselt"')+
+      `<div class="two">${select('Art','type',LOGTYPES,l.type)}${select('Kategorie','category',PARTCATS,l.category)}</div>`+
+      `<div class="two">${field('Datum','date',l.date,'date')}${field('Kilometerstand','km',l.km||'','number','inputmode="numeric"')}</div>`+
+      field('Kosten (€)','cost',l.cost||'','number','inputmode="decimal" step="0.01"')+
+      `<label>Notiz</label><textarea name="note">${esc(l.note)}</textarea>`,
+      async()=>{
+        const o=vals(); if(!o.title) return showErr('Bitte einen Titel eintragen.');
+        if(isNew) S.logs.push({id:uid(),...o}); else Object.assign(l,o);
+        bumpKm(o.km); await save(); closeSheet(); render();
+      },
+      isNew?null:async()=>{S.logs=S.logs.filter(x=>x.id!==l.id);await save();closeSheet();render();});
+  },
+
+  addPart:()=>A.editPart({}),
+  editPart:d=>{
+    const p=S.parts.find(x=>x.id===d.id)||{date:today(),category:(partFilter!=='Alle'?partFilter:'Motor'),status:'Verbaut'};
+    const isNew=!p.id;
+    openSheet(isNew?'Neues Teil':'Teil bearbeiten',
+      field('Bezeichnung','name',p.name,'text','placeholder="z. B. Sportluftfilter"')+
+      `<div class="two">${select('Kategorie','category',PARTCATS,p.category)}${select('Status','status',STATUS,p.status)}</div>`+
+      `<div class="two">${field('Preis (€)','price',p.price||'','number','inputmode="decimal" step="0.01"')}${field('Kaufdatum','date',p.date,'date')}</div>`+
+      `<div class="two">${field('Händler','vendor',p.vendor)}${field('Teilenummer','partno',p.partno)}</div>`+
+      `<label>Notiz</label><textarea name="note">${esc(p.note)}</textarea>`,
+      async()=>{
+        const o=vals(); if(!o.name) return showErr('Bitte eine Bezeichnung eintragen.');
+        if(isNew) S.parts.push({id:uid(),...o}); else Object.assign(p,o);
+        await save(); closeSheet(); render();
+      },
+      isNew?null:async()=>{S.parts=S.parts.filter(x=>x.id!==p.id);await save();closeSheet();render();});
+  },
+
+  addDoc:()=>{
+    openSheet('Dokument hinzufügen',
+      `<div class="filebox"><button class="btn" data-a="pickCam">Scannen</button><button class="btn" data-a="pickFile">Datei wählen</button></div><div class="fname" id="fname"></div>
+       <input type="file" id="fCam" accept="image/*" capture="environment" hidden>
+       <input type="file" id="fPick" accept="image/*,application/pdf" hidden>`+
+      field('Titel','title','','text','placeholder="z. B. TÜV-Gutachten 2026"')+
+      `<div class="two">${select('Kategorie','category',DOCCATS,'Fahrzeugpapiere')}${field('Datum','date',today(),'date')}</div>`,
+      async()=>{
+        const o=vals(); if(!pending) return showErr('Bitte zuerst ein Dokument scannen oder auswählen.');
+        if(!o.title) return showErr('Bitte einen Titel eintragen.');
+        const id=uid();
+        const ok=await store.set('img:'+id,pending.data);
+        if(!ok) return showErr('Speichern fehlgeschlagen. Die Datei ist evtl. zu groß.');
+        IMG['img:'+id]=pending.data;
+        S.docs.push({id,type:pending.type,...o}); await save(); closeSheet(); render();
+      });
+  },
+  pickCam:()=>$('#fCam').click(),
+  pickFile:()=>$('#fPick').click(),
+  openDoc:async d=>{
+    const doc=S.docs.find(x=>x.id===d.id); if(!doc) return;
+    const data=await loadImg('img:'+doc.id);
+    const view=!data?'<p class="meta">Datei nicht gefunden.</p>':
+      doc.type==='pdf'?`<a class="btn primary" style="display:block;text-align:center;text-decoration:none" href="${data}" download="${esc(doc.title)}.pdf">PDF öffnen oder herunterladen</a>`
+      :`<img alt="${esc(doc.title)}" src="${data}">`;
+    openSheet(doc.title,`<div class="viewer"><div class="meta">${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}</div>${view}</div>`,null,
+      async()=>{S.docs=S.docs.filter(x=>x.id!==doc.id);await store.del('img:'+doc.id);delete IMG['img:'+doc.id];await save();closeSheet();render();});
+  }
+};
+
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-a]'); if(!el) return;
+  const fn=A[el.dataset.a]; if(fn){e.stopPropagation();fn(el.dataset,el);}
+});
+document.addEventListener('change',async e=>{
+  const t=e.target;
+  if(t.id==='coverIn'&&t.files[0]&&S){
+    try{const r=await fileToData(t.files[0],1200); IMG[coverKey(S.id)]=r.data; S.cover=true; await store.set(coverKey(S.id),r.data); await save(); render();}
+    catch(err){alert(err.message)}
+    t.value='';
+  }
+  if((t.id==='fCam'||t.id==='fPick')&&t.files[0]){
+    try{pending=await fileToData(t.files[0],1600); $('#fname').textContent='Ausgewählt: '+t.files[0].name; showErr('');
+      const ti=document.querySelector('#sbody [name=title]'); if(ti&&!ti.value) ti.value=t.files[0].name.replace(/\.[^.]+$/,'');}
+    catch(err){showErr(err.message)}
+  }
+});
+
+/* ---------- Start ---------- */
+(async()=>{
+  const idx=await store.get('akte:index');
+  if(idx){ try{IDX=JSON.parse(idx).ids||[];}catch(e){IDX=[];} }
+  else{
+    // Übernahme der Daten aus der ersten Version (ein einzelnes Fahrzeug)
+    const old=await store.get('akte:main');
+    if(old){ try{
+      const o=JSON.parse(old), nv={...newVeh(),...o}; nv.id=uid();
+      const c=await store.get('img:cover'); if(c) await store.set(coverKey(nv.id),c);
+      await store.set('akte:v:'+nv.id,JSON.stringify(nv)); IDX=[nv.id]; await saveIndex();
+    }catch(e){} }
+  }
+  for(const id of IDX){ const r=await store.get('akte:v:'+id); if(r){ try{VEH[id]=JSON.parse(r);}catch(e){} } }
+  IDX=IDX.filter(id=>VEH[id]);
+  if(IDX.length===1){ S=VEH[IDX[0]]; view='vehicle'; }
+  render();
+})();
+</script>
+</body>
+</html>

@@ -23,7 +23,7 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.45}
-body{min-height:100vh;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+body{min-height:100vh;min-height:100dvh;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 button{font:inherit;color:inherit;cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .top{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:calc(12px + env(safe-area-inset-top)) 18px 12px;background:linear-gradient(var(--bg) 78%,transparent)}
@@ -33,6 +33,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.ghost{background:transparent}
 .btn.danger{color:var(--danger);border-color:transparent}
+.btn[disabled]{opacity:.45;cursor:default}
 .tl{display:flex;align-items:center;gap:10px}
 .back{padding:8px 12px;font-size:18px;line-height:1}
 .actions{flex-wrap:wrap}
@@ -98,7 +99,7 @@ button.card{display:block;width:100%;border:0;text-align:left;color:inherit;curs
 .empty b{display:block;color:var(--text);margin-bottom:4px}
 
 /* Navigation */
-nav{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(23,30,43,.96);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(23,30,43,.96);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
 nav button{background:none;border:0;padding:6px 0;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:11.5px}
 nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 nav button.on{color:var(--accent)}
@@ -123,7 +124,10 @@ textarea{min-height:64px;resize:vertical}
 .filebox{display:flex;gap:10px;margin-top:6px}
 .filebox .btn{flex:1}
 .fname{font-size:13px;color:var(--ok);margin-top:8px}
+.rmeta{color:var(--muted);font-size:12.5px;margin:10px 0 0}
+.panel .stats{margin:14px 0 0}
 .note{margin:14px 2px 0;color:var(--muted);font-size:12px;text-align:center}
+.note.warn{color:var(--warn)}
 </style>
 </head>
 <body>
@@ -135,6 +139,7 @@ textarea{min-height:64px;resize:vertical}
 <nav id="nav"></nav>
 <div id="sheet"></div>
 <input type="file" id="coverIn" accept="image/*" hidden>
+<input type="file" id="backupIn" accept="application/json,.json" hidden>
 
 <script>
 const PARTCATS=['Motor','Getriebe','Fahrwerk','Bremsen','Reifen','Felgen','Elektrik','Karosserie','Innenraum','Ersatzteile','Sonstiges'];
@@ -223,6 +228,56 @@ const km=n=>Number(n||0).toLocaleString('de-DE')+' km';
 const dt=s=>{if(!s)return '';const [y,m,d]=s.split('-');return d?`${d}.${m}.${y}`:`${m}/${y}`};
 const opts=(arr,sel)=>arr.map(o=>`<option${o===sel?' selected':''}>${esc(o)}</option>`).join('');
 
+/* Safari kennt <input type="month"> nicht; dann zwei Auswahlfelder statt eines Monatsfelds. */
+const nativeMonth=(()=>{const i=document.createElement('input');i.setAttribute('type','month');return i.type==='month'})();
+const MONTHNAMES=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+function monthField(label,name,val){
+  if(nativeMonth) return field(label,name,val,'month');
+  const [y,m]=String(val||'').split('-');
+  const now=new Date().getFullYear(), years=[];
+  for(let i=now-2;i<=now+15;i++) years.push(String(i));
+  return `<label>${label}</label><div class="two">
+    <select name="${name}_m"><option value="">Monat</option>${MONTHNAMES.map((n,i)=>{const v=String(i+1).padStart(2,'0');return `<option value="${v}"${v===m?' selected':''}>${n}</option>`}).join('')}</select>
+    <select name="${name}_y"><option value="">Jahr</option>${years.map(v=>`<option${v===y?' selected':''}>${v}</option>`).join('')}</select>
+  </div>`;
+}
+// Führt die beiden Auswahlfelder wieder zu "JJJJ-MM" zusammen.
+function normMonth(o,name){
+  if((name+'_y') in o){
+    o[name]=(o[name+'_y']&&o[name+'_m'])?o[name+'_y']+'-'+o[name+'_m']:'';
+    delete o[name+'_y']; delete o[name+'_m'];
+  }
+  return o;
+}
+
+/* Eine Datei an den Nutzer geben. Im Startbildschirm-Modus auf dem iPhone
+   scheitert <a download> teils stillschweigend - dort ist das Teilen-Blatt
+   der verlässliche Weg. Überall sonst bleibt es beim gewohnten Download. */
+async function saveFile(name,blob){
+  let file=null;
+  try{ file=new File([blob],name,{type:blob.type}) }catch(e){}
+  const canShare=file&&navigator.canShare&&navigator.share&&navigator.canShare({files:[file]});
+  const a=document.createElement('a');
+  if(canShare&&(navigator.standalone===true||!('download' in a))){
+    try{ await navigator.share({files:[file]}); return true }
+    catch(e){ if(e&&e.name==='AbortError') return true }
+  }
+  const url=URL.createObjectURL(blob);
+  a.href=url; a.download=name; a.rel='noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),3e4);
+  return true;
+}
+
+// data:-URL zurück in einen Blob; iOS öffnet data:-Verweise nicht.
+function dataToBlob(dataUrl){
+  const [head,b64]=String(dataUrl).split(',');
+  const mime=(head.match(/:(.*?);/)||[])[1]||'application/octet-stream';
+  const bin=atob(b64), arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
+
 function fileToData(file,max){
   return new Promise((res,rej)=>{
     if(file.type==='application/pdf'){
@@ -261,7 +316,7 @@ function render(){
   $('#sub').textContent=tab==='card'?'':(S.v.name||'');
   $('#topBtn').innerHTML=tab==='card'?'':`<button class="btn primary" data-a="${{log:'addLog',doc:'addDoc',part:'addPart'}[tab]}">Hinzufügen</button>`;
   $('#view').innerHTML=({card:viewCard,log:viewLog,doc:viewDoc,part:viewPart})[tab]()+
-    (persistent?'':'<p class="note">Hinweis: Speichern ist in dieser Umgebung nicht verfügbar. Daten gehen beim Schließen verloren.</p>');
+    (persistent?'':'<p class="note warn">Hinweis: Speichern ist in dieser Umgebung nicht verfügbar. Daten gehen beim Schließen verloren.</p>');
   hydrateImages();
 }
 
@@ -289,10 +344,14 @@ function renderGarage(){
       <div class="mh"><b>${esc(x.v.name||'Fahrzeug')}</b><span>${esc(x.v.variant)||'&nbsp;'}</span></div>
       <div class="ms"><span>${x.v.km?km(x.v.km):'–'}</span>${i?`<span class="pill ${i.c}">TÜV ${dt(x.v.tuev)}</span>`:''}</div>
     </div></button>`}).join('');
-  $('#view').innerHTML=list.length
+  const backup=`<div class="actions">
+      <button class="btn ghost" data-a="backupOut"${list.length?'':' disabled'}>Sicherung speichern</button>
+      <button class="btn ghost" data-a="backupIn">Sicherung einlesen</button>
+    </div><p class="note">Die Sicherung enthält alle Fahrzeuge samt Fotos und Dokumenten. Sie ist dein einziges Backup und der Weg, die Akte auf ein anderes Gerät zu holen.</p>`;
+  $('#view').innerHTML=(list.length
     ?banner+`<div class="grid">${cards}<button class="add" data-a="addVehicle"><b>+</b>Fahrzeug hinzufügen</button></div>`
-    :`<div class="empty"><b>Deine Garage ist leer</b>Lege dein erstes Fahrzeug an. Jedes bekommt eine eigene Karte.</div><div class="actions"><button class="btn primary" data-a="addVehicle">Erstes Fahrzeug anlegen</button></div>`;
-  (persistent||!IDX.length)||($('#view').insertAdjacentHTML('beforeend','<p class="note">Hinweis: Speichern ist in dieser Umgebung nicht verfügbar. Daten gehen beim Schließen verloren.</p>'));
+    :`<div class="empty"><b>Deine Garage ist leer</b>Lege dein erstes Fahrzeug an. Jedes bekommt eine eigene Karte.</div><div class="actions"><button class="btn primary" data-a="addVehicle">Erstes Fahrzeug anlegen</button></div>`)+backup;
+  (persistent||!IDX.length)||($('#view').insertAdjacentHTML('beforeend','<p class="note warn">Hinweis: Speichern ist in dieser Umgebung nicht verfügbar. Daten gehen beim Schließen verloren.</p>'));
   hydrateImages();
 }
 
@@ -403,20 +462,88 @@ async function hydrateImages(){
 }
 
 /* ---------- Sheet ---------- */
-let sheetSave=null, sheetDel=null, pending=null;
+let sheetSave=null, sheetDel=null, pending=null, pendingDoc=null;
 function openSheet(title,body,onSave,del){
   sheetSave=onSave; sheetDel=del||null; pending=null;
   $('#sheet').innerHTML=`<div class="scrim" data-a="close"></div><div class="panel" role="dialog" aria-label="${esc(title)}"><div class="grab"></div><h2>${esc(title)}</h2><div id="sbody">${body}</div><div class="err" id="err"></div>
   <div class="row">${del?'<button class="btn ghost danger" data-a="del">Löschen</button>':''}<button class="btn ghost" data-a="close">${onSave?'Abbrechen':'Schließen'}</button>${onSave?'<button class="btn primary" data-a="ok">Speichern</button>':''}</div></div>`;
   $('#sheet').classList.add('open');
 }
-const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=null;};
+const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=pendingDoc=null;};
 const vals=()=>{const o={};document.querySelectorAll('#sbody [name]').forEach(e=>o[e.name]=e.value.trim());return o;};
 const showErr=m=>{$('#err').textContent=m};
 const field=(label,name,val='',type='text',extra='')=>`<label>${label}</label><input name="${name}" type="${type}" value="${esc(val)}" ${extra}>`;
 const select=(label,name,arr,sel)=>`<label>${label}</label><select name="${name}">${opts(arr,sel)}</select>`;
 
 function bumpKm(k){ k=Number(k); if(k&&k>Number(S.v.km||0)) S.v.km=k; }
+
+/* ---------- Sicherung ---------- */
+const BACKUP_TAG='fahrzeugakte';
+let pendingBackup=null;
+
+async function collectBackup(){
+  const out={app:BACKUP_TAG,version:1,exported:new Date().toISOString(),vehicles:[],images:{}};
+  for(const id of IDX){
+    const x=VEH[id]; if(!x) continue;
+    out.vehicles.push(x);
+    if(x.cover){ const d=await loadImg(coverKey(id)); if(d) out.images[coverKey(id)]=d; }
+    for(const doc of x.docs||[]){ const d=await loadImg('img:'+doc.id); if(d) out.images['img:'+doc.id]=d; }
+  }
+  return out;
+}
+
+async function applyBackup(d,replace){
+  if(replace){
+    for(const id of IDX.slice()){
+      const x=VEH[id]; if(!x) continue;
+      for(const doc of x.docs||[]){ await store.del('img:'+doc.id); delete IMG['img:'+doc.id]; }
+      await store.del(coverKey(id)); delete IMG[coverKey(id)];
+      await store.del('akte:v:'+id);
+    }
+    IDX=[]; VEH={};
+  }
+  let fail=0;
+  for(const k of Object.keys(d.images||{})){ if(await store.set(k,d.images[k])) IMG[k]=d.images[k]; else fail++; }
+  for(const x of d.vehicles){
+    if(!x||!x.id) continue;
+    // Beim Zusammenführen ersetzt die Sicherung ein Fahrzeug gleicher Kennung;
+    // Bilder verwaister Dokumente werden dabei aufgeräumt.
+    const old=VEH[x.id];
+    if(old) for(const doc of old.docs||[]) if(!(x.docs||[]).some(y=>y.id===doc.id)){ await store.del('img:'+doc.id); delete IMG['img:'+doc.id]; }
+    const base=newVeh();
+    const nv={...base,...x,v:{...base.v,...(x.v||{})},logs:x.logs||[],parts:x.parts||[],docs:x.docs||[]};
+    VEH[nv.id]=nv;
+    if(!IDX.includes(nv.id)) IDX.push(nv.id);
+    await store.set('akte:v:'+nv.id,JSON.stringify(nv));
+  }
+  await saveIndex();
+  pendingBackup=null; S=null; view='garage';
+  closeSheet(); render(); window.scrollTo(0,0);
+  if(fail) alert(fail+' Bilder konnten nicht gespeichert werden. Der Speicher ist evtl. voll.');
+}
+
+function askRestore(d){
+  const n=(f)=>d.vehicles.reduce((a,x)=>a+((x[f]||[]).length),0);
+  const names=d.vehicles.map(x=>esc((x.v&&x.v.name)||'Fahrzeug')).join(', ')||'keine';
+  openSheet('Sicherung einlesen',
+    `<p class="rmeta">Erstellt am ${esc(dt((d.exported||'').slice(0,10)))||'unbekannt'}</p>
+     <div class="stats">
+       <div class="stat"><span>Fahrzeuge</span><b>${d.vehicles.length}</b></div>
+       <div class="stat"><span>Logbuch-Einträge</span><b>${n('logs')}</b></div>
+       <div class="stat"><span>Dokumente</span><b>${n('docs')}</b></div>
+       <div class="stat"><span>Teile</span><b>${n('parts')}</b></div>
+       <div class="stat"><span>Bilder und PDFs</span><b>${Object.keys(d.images||{}).length}</b></div>
+     </div>
+     <p class="rmeta">Enthalten: ${names}</p>
+     <label>Wie soll eingelesen werden?</label>
+     <div class="two">
+       <button class="btn" data-a="restoreMerge">Zusammenführen</button>
+       <button class="btn ghost danger" data-a="restoreReplace">Alles ersetzen</button>
+     </div>
+     <p class="rmeta">Zusammenführen behält deine jetzigen Fahrzeuge und überschreibt nur die, die auch in der Sicherung stehen. Alles ersetzen verwirft zuerst die gesamte Garage.</p>`,
+    null);
+  pendingBackup=d;
+}
 
 function vehicleSheet(isNew){
   const v=isNew?newVeh().v:S.v;
@@ -426,9 +553,11 @@ function vehicleSheet(isNew){
     `<div class="two">${field('Kennzeichen','plate',v.plate)}${field('Baujahr','year',v.year,'number','inputmode="numeric"')}</div>`+
     `<div class="two">${field('Leistung (PS)','power',v.power,'number','inputmode="numeric"')}${field('Hubraum (cm³)','displacement',v.displacement,'number','inputmode="numeric"')}</div>`+
     `<div class="two">${field('Kraftstoff','fuel',v.fuel,'text','placeholder="Benzin, Diesel …"')}${field('Kilometerstand','km',v.km||'','number','inputmode="numeric"')}</div>`+
-    `<div class="two">${field('TÜV gültig bis','tuev',v.tuev,'month')}${field('FIN (optional)','vin',v.vin)}</div>`,
+    (nativeMonth
+      ?`<div class="two">${field('TÜV gültig bis','tuev',v.tuev,'month')}${field('FIN (optional)','vin',v.vin)}</div>`
+      :monthField('TÜV gültig bis','tuev',v.tuev)+field('FIN (optional)','vin',v.vin)),
     async()=>{
-      const o=vals(); if(!o.name) return showErr('Bitte Marke und Modell eintragen.');
+      const o=normMonth(vals(),'tuev'); if(!o.name) return showErr('Bitte Marke und Modell eintragen.');
       if(isNew){const nv=newVeh(); nv.v={...nv.v,...o,km:Number(o.km||0)}; VEH[nv.id]=nv; IDX.push(nv.id); S=nv; view='vehicle'; tab='card';}
       else S.v={...S.v,...o,km:Number(o.km||0)};
       await save(); closeSheet(); render();
@@ -459,7 +588,7 @@ const A={
   open:d=>{S=VEH[d.id];view='vehicle';tab='card';logFilter=partFilter='Alle';window._df='Alle';render();window.scrollTo(0,0)},
   addVehicle:()=>vehicleSheet(true),
   editVehicle:()=>vehicleSheet(false),
-  tuevIcs:()=>{
+  tuevIcs:async()=>{
     if(!S.v.tuev) return;
     const [y,m]=S.v.tuev.split('-').map(Number), p=n=>String(n).padStart(2,'0');
     const last=new Date(y,m,0), nx=new Date(y,m,1);
@@ -470,14 +599,26 @@ const A={
       'SUMMARY:TÜV fällig: '+name,'DESCRIPTION:Die Hauptuntersuchung ist bis Ende des Monats gültig.',
       'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:TÜV in 30 Tagen fällig','TRIGGER:-P30D','END:VALARM',
       'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:TÜV in 7 Tagen fällig','TRIGGER:-P7D','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
-    const a=document.createElement('a');
-    a.href='data:text/calendar;charset=utf-8,'+encodeURIComponent(ics);
-    a.download='TUEV-'+(S.v.plate||S.v.name||'Fahrzeug').replace(/[^\w-]+/g,'_')+'.ics';
-    document.body.appendChild(a);a.click();a.remove();
+    await saveFile('TUEV-'+(S.v.plate||S.v.name||'Fahrzeug').replace(/[^\w-]+/g,'_')+'.ics',
+      new Blob([ics],{type:'text/calendar;charset=utf-8'}));
   },
   updateKm:()=>{
     openSheet('Kilometerstand',field('Aktueller Stand (km)','km',S.v.km||'','number','inputmode="numeric"'),
       async()=>{const o=vals(); if(o.km==='') return showErr('Bitte einen Kilometerstand eintragen.'); S.v.km=Number(o.km); await save(); closeSheet(); render();});
+  },
+
+  backupOut:async()=>{
+    if(!IDX.length) return;
+    try{
+      const blob=new Blob([JSON.stringify(await collectBackup())],{type:'application/json'});
+      await saveFile('fahrzeugakte-sicherung-'+today()+'.json',blob);
+    }catch(err){ alert('Die Sicherung konnte nicht erstellt werden: '+err.message) }
+  },
+  backupIn:()=>$('#backupIn').click(),
+  restoreMerge:()=>{ if(pendingBackup) applyBackup(pendingBackup,false) },
+  restoreReplace:(d,el)=>{
+    if(!el.dataset.armed){el.dataset.armed=1;el.textContent='Wirklich alles ersetzen?';return;}
+    if(pendingBackup) applyBackup(pendingBackup,true);
   },
 
   addLog:()=>A.editLog({}),
@@ -539,10 +680,16 @@ const A={
     const doc=S.docs.find(x=>x.id===d.id); if(!doc) return;
     const data=await loadImg('img:'+doc.id);
     const view=!data?'<p class="meta">Datei nicht gefunden.</p>':
-      doc.type==='pdf'?`<a class="btn primary" style="display:block;text-align:center;text-decoration:none" href="${data}" download="${esc(doc.title)}.pdf">PDF öffnen oder herunterladen</a>`
+      doc.type==='pdf'?'<button class="btn primary" style="display:block;width:100%" data-a="savePdf">PDF öffnen oder sichern</button>'
       :`<img alt="${esc(doc.title)}" src="${data}">`;
+    pendingDoc=(data&&doc.type==='pdf')?{name:doc.title.replace(/[^\w -]+/g,'_')+'.pdf',data}:null;
     openSheet(doc.title,`<div class="viewer"><div class="meta">${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}</div>${view}</div>`,null,
       async()=>{S.docs=S.docs.filter(x=>x.id!==doc.id);await store.del('img:'+doc.id);delete IMG['img:'+doc.id];await save();closeSheet();render();});
+  },
+  savePdf:async()=>{
+    if(!pendingDoc) return;
+    try{ await saveFile(pendingDoc.name,dataToBlob(pendingDoc.data)) }
+    catch(err){ alert('Die PDF konnte nicht geöffnet werden: '+err.message) }
   }
 };
 
@@ -559,6 +706,14 @@ document.addEventListener('change',async e=>{
       IMG[coverKey(S.id)]=r.data; S.cover=true; await save(); render();
     }catch(err){alert(err.message)}
     t.value='';
+  }
+  if(t.id==='backupIn'&&t.files[0]){
+    const f=t.files[0]; t.value='';
+    try{
+      const d=JSON.parse(await f.text());
+      if(!d||d.app!==BACKUP_TAG||!Array.isArray(d.vehicles)) throw new Error('Diese Datei ist keine Sicherung der Fahrzeugakte.');
+      askRestore(d);
+    }catch(err){ alert(err.message||'Die Datei konnte nicht gelesen werden.') }
   }
   if((t.id==='fCam'||t.id==='fPick')&&t.files[0]){
     try{pending=await fileToData(t.files[0],1600); $('#fname').textContent='Ausgewählt: '+t.files[0].name; showErr('');

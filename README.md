@@ -14,7 +14,8 @@ Daraus folgen zwei Dinge:
 - Die Daten sind **nicht** zwischen Geräten synchronisiert. Was du auf dem Handy
   erfasst, steht nicht auf dem Laptop.
 - Es gibt **kein** automatisches Backup. Löschst du die Website-Daten im Browser
-  oder deinstallierst die App vom Homescreen, sind die Einträge weg.
+  oder deinstallierst die App vom Homescreen, sind die Einträge weg. Nutze
+  regelmäßig die Sicherung (siehe unten).
 
 Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
 
@@ -52,6 +53,27 @@ schnell sprengen. Bilder werden vor dem Speichern auf max. 1200 px (Titelbild)
 bzw. 1600 px (Dokumente) verkleinert und als JPEG abgelegt; PDFs sind auf
 3,5 MB begrenzt. Zusätzlich fragt die App per `navigator.storage.persist()` eine
 dauerhafte Ablage an, damit der Browser die Akte bei Platzmangel nicht räumt.
+
+## Sicherung
+
+In der Garage liegen unten zwei Schaltflächen:
+
+- **Sicherung speichern** – schreibt die komplette Akte in eine Datei
+  `fahrzeugakte-sicherung-JJJJ-MM-TT.json`. Darin stecken alle Fahrzeuge,
+  Logbuch-Einträge, Teile, Dokumente **und** die Bilder selbst (als Data-URL
+  eingebettet). Die Datei ist damit alles, was du zum Wiederherstellen brauchst.
+- **Sicherung einlesen** – zeigt erst, was in der Datei steckt, und fragt dann:
+  - *Zusammenführen* behält die vorhandenen Fahrzeuge und überschreibt nur die,
+    deren Kennung auch in der Sicherung vorkommt. Es entstehen keine Duplikate.
+  - *Alles ersetzen* verwirft zuerst die gesamte Garage. Diese Schaltfläche
+    fragt zur Sicherheit ein zweites Mal nach.
+
+Weil die Bilder mitgeschrieben werden, kann die Datei groß werden — bei vielen
+eingescannten Dokumenten schnell etliche MB. Das ist gewollt: eine Sicherung
+ohne Bilder wäre nur eine halbe Sicherung.
+
+Das ist zugleich der einzige Weg, die Akte von einem Gerät auf ein anderes zu
+bringen, denn es gibt keine Synchronisation.
 
 ## Lokal ausprobieren
 
@@ -98,7 +120,29 @@ Einmalig im Repository unter **Settings** zu erledigen:
    abschalten, wenn du sie nicht brauchst.
 5. **Push protection** – `Advanced Security` → `Push protection` aktivieren.
 
-## Auf dem iPhone installieren
+## Auf dem Handy installieren
 
-Pages-URL in **Safari** öffnen (nicht Chrome) → Teilen-Symbol → *Zum Home-Bildschirm*.
-Danach startet die Fahrzeugakte im Vollbild und funktioniert offline.
+**Android** (getestet auf Pixel 8 Pro): Pages-URL in Chrome öffnen → Menü →
+*App installieren*. Chrome bietet die Installation meist auch von selbst an.
+
+**iPhone / iPad**: Pages-URL in **Safari** öffnen (nicht Chrome, dort fehlt der
+Menüpunkt) → Teilen-Symbol → *Zum Home-Bildschirm*.
+
+Auf dem iPhone ist das Hinzufügen zum Home-Bildschirm nicht nur Bequemlichkeit,
+sondern Pflicht: Safari räumt den Speicher einer nur im Browser besuchten Seite
+nach sieben Tagen ohne Besuch ab. Für Web-Apps auf dem Home-Bildschirm gilt das
+nicht. Also installieren — oder regelmäßig sichern.
+
+## Plattform-Unterschiede
+
+Beides ist im Code berücksichtigt:
+
+| Thema | Android / Chrome | iOS / Safari |
+| --- | --- | --- |
+| TÜV-Monat | natives Monatsfeld | zwei Auswahlfelder, weil Safari `input[type=month]` nicht kennt |
+| Dateien ausgeben | Download | im Startbildschirm-Modus über das Teilen-Blatt, weil `<a download>` dort still scheitern kann |
+| PDF ansehen | Blob-Verweis | Blob-Verweis; `data:`-Verweise öffnet iOS nicht |
+| Speicher | IndexedDB, dauerhaft angefragt | IndexedDB; `persist()` fehlt, dafür schützt der Home-Bildschirm |
+
+Die Erkennung läuft über Funktionsprüfung, nicht über die Browserkennung — es
+wird also nichts anhand des Gerätenamens geraten.

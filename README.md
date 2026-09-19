@@ -1,4 +1,4 @@
-# Fahrzeugakte
+# CarCollection
 
 Eine Web-App zur Verwaltung mehrerer Fahrzeuge: Garage, Logbuch, Dokumente und
 Teile. Kein Build-Schritt, keine Abhängigkeiten, kein Server, kein Konto.
@@ -59,7 +59,7 @@ dauerhafte Ablage an, damit der Browser die Akte bei Platzmangel nicht räumt.
 In der Garage liegen unten zwei Schaltflächen:
 
 - **Sicherung speichern** – schreibt die komplette Akte in eine Datei
-  `fahrzeugakte-sicherung-JJJJ-MM-TT.json`. Darin stecken alle Fahrzeuge,
+  `carcollection-sicherung-JJJJ-MM-TT.json`. Darin stecken alle Fahrzeuge,
   Logbuch-Einträge, Teile, Dokumente **und** die Bilder selbst (als Data-URL
   eingebettet). Die Datei ist damit alles, was du zum Wiederherstellen brauchst.
 - **Sicherung einlesen** – zeigt erst, was in der Datei steckt, und fragt dann:
@@ -121,8 +121,8 @@ python3 -m http.server 8765
 
 ### Nach jeder Änderung an der App
 
-In `sw.js` die Konstante `CACHE` hochzählen (`fahrzeugakte-v1` →
-`fahrzeugakte-v2`). Sonst liefert der Service Worker bei manchen Aufrufen
+In `sw.js` die Konstante `CACHE` hochzählen (`carcollection-v1` →
+`carcollection-v2`). Sonst liefert der Service Worker bei manchen Aufrufen
 weiterhin die alte Fassung aus dem Cache aus.
 
 ## Einrichtung auf GitHub

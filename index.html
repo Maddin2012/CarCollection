@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#10151F">
-<meta name="description" content="Fahrzeugakte: Garage, Logbuch, Dokumente und Teile für deine Fahrzeuge - alle Daten bleiben auf deinem Gerät.">
-<title>Fahrzeugakte</title>
+<meta name="description" content="CarCollection: Garage, Logbuch, Dokumente und Teile für deine Fahrzeuge - alle Daten bleiben auf deinem Gerät.">
+<title>CarCollection</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Fahrzeugakte">
+<meta name="apple-mobile-web-app-title" content="CarCollection">
 <style>
 :root{
   --bg:#10151F; --surface:#171E2B; --surface2:#1F2837; --line:#2C3649;
@@ -132,7 +132,7 @@ textarea{min-height:64px;resize:vertical}
 </head>
 <body>
 <div class="top">
-  <div class="tl"><button class="btn ghost back" id="back" data-a="garage" aria-label="Zur Garage" hidden>‹</button><div><h1 id="title">Fahrzeugakte</h1><small id="sub"></small></div></div>
+  <div class="tl"><button class="btn ghost back" id="back" data-a="garage" aria-label="Zur Garage" hidden>‹</button><div><h1 id="title">CarCollection</h1><small id="sub"></small></div></div>
   <div id="topBtn"></div>
 </div>
 <div class="wrap" id="view"></div>
@@ -311,7 +311,7 @@ function render(){
   if(view==='garage') return renderGarage();
   $('#nav').style.display='grid'; $('#back').hidden=false;
   $('#nav').innerHTML=TABS.map(([k,l])=>`<button data-a="tab" data-k="${k}" class="${tab===k?'on':''}"><svg viewBox="0 0 24 24">${ICONS[k]}</svg>${l}</button>`).join('');
-  const titles={card:'Fahrzeugakte',log:'Logbuch',doc:'Dokumente',part:'Teile'};
+  const titles={card:'CarCollection',log:'Logbuch',doc:'Dokumente',part:'Teile'};
   $('#title').textContent=titles[tab];
   $('#sub').textContent=tab==='card'?'':(S.v.name||'');
   $('#topBtn').innerHTML=tab==='card'?'':`<button class="btn primary" data-a="${{log:'addLog',doc:'addDoc',part:'addPart'}[tab]}">Hinzufügen</button>`;
@@ -478,7 +478,9 @@ const select=(label,name,arr,sel)=>`<label>${label}</label><select name="${name}
 function bumpKm(k){ k=Number(k); if(k&&k>Number(S.v.km||0)) S.v.km=k; }
 
 /* ---------- Sicherung ---------- */
-const BACKUP_TAG='fahrzeugakte';
+const BACKUP_TAG='carcollection';
+// Sicherungen aus der Zeit, als die App noch Fahrzeugakte hieß, bleiben lesbar.
+const BACKUP_TAGS=[BACKUP_TAG,'fahrzeugakte'];
 let pendingBackup=null;
 
 async function collectBackup(){
@@ -594,7 +596,7 @@ const A={
     const last=new Date(y,m,0), nx=new Date(y,m,1);
     const f=d=>`${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}`;
     const name=(S.v.name||'Fahrzeug')+(S.v.plate?' ('+S.v.plate+')':'');
-    const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Fahrzeugakte//DE','BEGIN:VEVENT','UID:tuev-'+S.id+'-'+f(last)+'@fahrzeugakte',
+    const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//CarCollection//DE','BEGIN:VEVENT','UID:tuev-'+S.id+'-'+f(last)+'@fahrzeugakte',
       'DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z','DTSTART;VALUE=DATE:'+f(last),'DTEND;VALUE=DATE:'+f(nx),
       'SUMMARY:TÜV fällig: '+name,'DESCRIPTION:Die Hauptuntersuchung ist bis Ende des Monats gültig.',
       'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:TÜV in 30 Tagen fällig','TRIGGER:-P30D','END:VALARM',
@@ -611,7 +613,7 @@ const A={
     if(!IDX.length) return;
     try{
       const blob=new Blob([JSON.stringify(await collectBackup())],{type:'application/json'});
-      await saveFile('fahrzeugakte-sicherung-'+today()+'.json',blob);
+      await saveFile('carcollection-sicherung-'+today()+'.json',blob);
     }catch(err){ alert('Die Sicherung konnte nicht erstellt werden: '+err.message) }
   },
   backupIn:()=>$('#backupIn').click(),
@@ -711,7 +713,7 @@ document.addEventListener('change',async e=>{
     const f=t.files[0]; t.value='';
     try{
       const d=JSON.parse(await f.text());
-      if(!d||d.app!==BACKUP_TAG||!Array.isArray(d.vehicles)) throw new Error('Diese Datei ist keine Sicherung der Fahrzeugakte.');
+      if(!d||!BACKUP_TAGS.includes(d.app)||!Array.isArray(d.vehicles)) throw new Error('Diese Datei ist keine Sicherung von CarCollection.');
       askRestore(d);
     }catch(err){ alert(err.message||'Die Datei konnte nicht gelesen werden.') }
   }

@@ -18,7 +18,7 @@ Diese Regel wiegt schwerer als eine schnelle Antwort.
 
 ## Das Projekt
 
-Die Fahrzeugakte ist eine Single-File-Web-App: `index.html` enthält Markup,
+CarCollection ist eine Single-File-Web-App: `index.html` enthält Markup,
 Styles und die gesamte Logik. Kein Build, keine Abhängigkeiten, kein Server.
 Beschreibung der Funktionen und der Einrichtung steht in `README.md`.
 
@@ -33,7 +33,7 @@ Fahrzeugpapiere oder Rechnungen ins Repository committen. Keine Funktion
 einbauen, die Nutzerdaten irgendwohin überträgt, ohne das vorher zu besprechen.
 
 **Nach jeder Änderung an ausgelieferten Dateien `CACHE` in `sw.js` hochzählen**
-(`fahrzeugakte-v3` → `fahrzeugakte-v4`). Sonst liefert der Service Worker bei
+(`carcollection-v1` → `carcollection-v2`). Sonst liefert der Service Worker bei
 manchen Aufrufen weiter die alte Fassung aus dem Cache aus.
 
 **Plattform-Weichen über Funktionsprüfung, nie über die Browserkennung.** Die

@@ -59,7 +59,7 @@ export default async function ({ browser, base, ok }) {
 
   // --- PWA-Bausteine ---
   const manifest = await page.evaluate(() => fetch('manifest.webmanifest').then(r => r.ok && r.json()));
-  ok(manifest && manifest.name === 'Fahrzeugakte' && manifest.icons.length === 4, 'Manifest wird ausgeliefert');
+  ok(manifest && manifest.name === 'CarCollection' && manifest.icons.length === 4, 'Manifest wird ausgeliefert');
   ok(await page.evaluate(() => navigator.serviceWorker.getRegistration().then(r => !!r)), 'Service Worker registriert');
   for (const i of ['icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png']) {
     ok(await page.evaluate(u => fetch(u).then(r => r.status), i) === 200, `Icon erreichbar: ${i}`);

@@ -23,7 +23,7 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.45}
-body{min-height:100vh;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+body{min-height:100vh;min-height:100dvh;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 button{font:inherit;color:inherit;cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .top{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:calc(12px + env(safe-area-inset-top)) 18px 12px;background:linear-gradient(var(--bg) 78%,transparent)}
@@ -99,7 +99,7 @@ button.card{display:block;width:100%;border:0;text-align:left;color:inherit;curs
 .empty b{display:block;color:var(--text);margin-bottom:4px}
 
 /* Navigation */
-nav{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(23,30,43,.96);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(23,30,43,.96);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
 nav button{background:none;border:0;padding:6px 0;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:11.5px}
 nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 nav button.on{color:var(--accent)}
@@ -227,6 +227,56 @@ const eur=n=>Number(n||0).toLocaleString('de-DE',{style:'currency',currency:'EUR
 const km=n=>Number(n||0).toLocaleString('de-DE')+' km';
 const dt=s=>{if(!s)return '';const [y,m,d]=s.split('-');return d?`${d}.${m}.${y}`:`${m}/${y}`};
 const opts=(arr,sel)=>arr.map(o=>`<option${o===sel?' selected':''}>${esc(o)}</option>`).join('');
+
+/* Safari kennt <input type="month"> nicht; dann zwei Auswahlfelder statt eines Monatsfelds. */
+const nativeMonth=(()=>{const i=document.createElement('input');i.setAttribute('type','month');return i.type==='month'})();
+const MONTHNAMES=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+function monthField(label,name,val){
+  if(nativeMonth) return field(label,name,val,'month');
+  const [y,m]=String(val||'').split('-');
+  const now=new Date().getFullYear(), years=[];
+  for(let i=now-2;i<=now+15;i++) years.push(String(i));
+  return `<label>${label}</label><div class="two">
+    <select name="${name}_m"><option value="">Monat</option>${MONTHNAMES.map((n,i)=>{const v=String(i+1).padStart(2,'0');return `<option value="${v}"${v===m?' selected':''}>${n}</option>`}).join('')}</select>
+    <select name="${name}_y"><option value="">Jahr</option>${years.map(v=>`<option${v===y?' selected':''}>${v}</option>`).join('')}</select>
+  </div>`;
+}
+// Führt die beiden Auswahlfelder wieder zu "JJJJ-MM" zusammen.
+function normMonth(o,name){
+  if((name+'_y') in o){
+    o[name]=(o[name+'_y']&&o[name+'_m'])?o[name+'_y']+'-'+o[name+'_m']:'';
+    delete o[name+'_y']; delete o[name+'_m'];
+  }
+  return o;
+}
+
+/* Eine Datei an den Nutzer geben. Im Startbildschirm-Modus auf dem iPhone
+   scheitert <a download> teils stillschweigend - dort ist das Teilen-Blatt
+   der verlässliche Weg. Überall sonst bleibt es beim gewohnten Download. */
+async function saveFile(name,blob){
+  let file=null;
+  try{ file=new File([blob],name,{type:blob.type}) }catch(e){}
+  const canShare=file&&navigator.canShare&&navigator.share&&navigator.canShare({files:[file]});
+  const a=document.createElement('a');
+  if(canShare&&(navigator.standalone===true||!('download' in a))){
+    try{ await navigator.share({files:[file]}); return true }
+    catch(e){ if(e&&e.name==='AbortError') return true }
+  }
+  const url=URL.createObjectURL(blob);
+  a.href=url; a.download=name; a.rel='noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),3e4);
+  return true;
+}
+
+// data:-URL zurück in einen Blob; iOS öffnet data:-Verweise nicht.
+function dataToBlob(dataUrl){
+  const [head,b64]=String(dataUrl).split(',');
+  const mime=(head.match(/:(.*?);/)||[])[1]||'application/octet-stream';
+  const bin=atob(b64), arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
 
 function fileToData(file,max){
   return new Promise((res,rej)=>{
@@ -412,14 +462,14 @@ async function hydrateImages(){
 }
 
 /* ---------- Sheet ---------- */
-let sheetSave=null, sheetDel=null, pending=null;
+let sheetSave=null, sheetDel=null, pending=null, pendingDoc=null;
 function openSheet(title,body,onSave,del){
   sheetSave=onSave; sheetDel=del||null; pending=null;
   $('#sheet').innerHTML=`<div class="scrim" data-a="close"></div><div class="panel" role="dialog" aria-label="${esc(title)}"><div class="grab"></div><h2>${esc(title)}</h2><div id="sbody">${body}</div><div class="err" id="err"></div>
   <div class="row">${del?'<button class="btn ghost danger" data-a="del">Löschen</button>':''}<button class="btn ghost" data-a="close">${onSave?'Abbrechen':'Schließen'}</button>${onSave?'<button class="btn primary" data-a="ok">Speichern</button>':''}</div></div>`;
   $('#sheet').classList.add('open');
 }
-const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=null;};
+const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=pendingDoc=null;};
 const vals=()=>{const o={};document.querySelectorAll('#sbody [name]').forEach(e=>o[e.name]=e.value.trim());return o;};
 const showErr=m=>{$('#err').textContent=m};
 const field=(label,name,val='',type='text',extra='')=>`<label>${label}</label><input name="${name}" type="${type}" value="${esc(val)}" ${extra}>`;
@@ -503,9 +553,11 @@ function vehicleSheet(isNew){
     `<div class="two">${field('Kennzeichen','plate',v.plate)}${field('Baujahr','year',v.year,'number','inputmode="numeric"')}</div>`+
     `<div class="two">${field('Leistung (PS)','power',v.power,'number','inputmode="numeric"')}${field('Hubraum (cm³)','displacement',v.displacement,'number','inputmode="numeric"')}</div>`+
     `<div class="two">${field('Kraftstoff','fuel',v.fuel,'text','placeholder="Benzin, Diesel …"')}${field('Kilometerstand','km',v.km||'','number','inputmode="numeric"')}</div>`+
-    `<div class="two">${field('TÜV gültig bis','tuev',v.tuev,'month')}${field('FIN (optional)','vin',v.vin)}</div>`,
+    (nativeMonth
+      ?`<div class="two">${field('TÜV gültig bis','tuev',v.tuev,'month')}${field('FIN (optional)','vin',v.vin)}</div>`
+      :monthField('TÜV gültig bis','tuev',v.tuev)+field('FIN (optional)','vin',v.vin)),
     async()=>{
-      const o=vals(); if(!o.name) return showErr('Bitte Marke und Modell eintragen.');
+      const o=normMonth(vals(),'tuev'); if(!o.name) return showErr('Bitte Marke und Modell eintragen.');
       if(isNew){const nv=newVeh(); nv.v={...nv.v,...o,km:Number(o.km||0)}; VEH[nv.id]=nv; IDX.push(nv.id); S=nv; view='vehicle'; tab='card';}
       else S.v={...S.v,...o,km:Number(o.km||0)};
       await save(); closeSheet(); render();
@@ -536,7 +588,7 @@ const A={
   open:d=>{S=VEH[d.id];view='vehicle';tab='card';logFilter=partFilter='Alle';window._df='Alle';render();window.scrollTo(0,0)},
   addVehicle:()=>vehicleSheet(true),
   editVehicle:()=>vehicleSheet(false),
-  tuevIcs:()=>{
+  tuevIcs:async()=>{
     if(!S.v.tuev) return;
     const [y,m]=S.v.tuev.split('-').map(Number), p=n=>String(n).padStart(2,'0');
     const last=new Date(y,m,0), nx=new Date(y,m,1);
@@ -547,10 +599,8 @@ const A={
       'SUMMARY:TÜV fällig: '+name,'DESCRIPTION:Die Hauptuntersuchung ist bis Ende des Monats gültig.',
       'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:TÜV in 30 Tagen fällig','TRIGGER:-P30D','END:VALARM',
       'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:TÜV in 7 Tagen fällig','TRIGGER:-P7D','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
-    const a=document.createElement('a');
-    a.href='data:text/calendar;charset=utf-8,'+encodeURIComponent(ics);
-    a.download='TUEV-'+(S.v.plate||S.v.name||'Fahrzeug').replace(/[^\w-]+/g,'_')+'.ics';
-    document.body.appendChild(a);a.click();a.remove();
+    await saveFile('TUEV-'+(S.v.plate||S.v.name||'Fahrzeug').replace(/[^\w-]+/g,'_')+'.ics',
+      new Blob([ics],{type:'text/calendar;charset=utf-8'}));
   },
   updateKm:()=>{
     openSheet('Kilometerstand',field('Aktueller Stand (km)','km',S.v.km||'','number','inputmode="numeric"'),
@@ -561,10 +611,7 @@ const A={
     if(!IDX.length) return;
     try{
       const blob=new Blob([JSON.stringify(await collectBackup())],{type:'application/json'});
-      const url=URL.createObjectURL(blob), a=document.createElement('a');
-      a.href=url; a.download='fahrzeugakte-sicherung-'+today()+'.json';
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(()=>URL.revokeObjectURL(url),2000);
+      await saveFile('fahrzeugakte-sicherung-'+today()+'.json',blob);
     }catch(err){ alert('Die Sicherung konnte nicht erstellt werden: '+err.message) }
   },
   backupIn:()=>$('#backupIn').click(),
@@ -633,10 +680,16 @@ const A={
     const doc=S.docs.find(x=>x.id===d.id); if(!doc) return;
     const data=await loadImg('img:'+doc.id);
     const view=!data?'<p class="meta">Datei nicht gefunden.</p>':
-      doc.type==='pdf'?`<a class="btn primary" style="display:block;text-align:center;text-decoration:none" href="${data}" download="${esc(doc.title)}.pdf">PDF öffnen oder herunterladen</a>`
+      doc.type==='pdf'?'<button class="btn primary" style="display:block;width:100%" data-a="savePdf">PDF öffnen oder sichern</button>'
       :`<img alt="${esc(doc.title)}" src="${data}">`;
+    pendingDoc=(data&&doc.type==='pdf')?{name:doc.title.replace(/[^\w -]+/g,'_')+'.pdf',data}:null;
     openSheet(doc.title,`<div class="viewer"><div class="meta">${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}</div>${view}</div>`,null,
       async()=>{S.docs=S.docs.filter(x=>x.id!==doc.id);await store.del('img:'+doc.id);delete IMG['img:'+doc.id];await save();closeSheet();render();});
+  },
+  savePdf:async()=>{
+    if(!pendingDoc) return;
+    try{ await saveFile(pendingDoc.name,dataToBlob(pendingDoc.data)) }
+    catch(err){ alert('Die PDF konnte nicht geöffnet werden: '+err.message) }
   }
 };
 

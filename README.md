@@ -120,7 +120,29 @@ Einmalig im Repository unter **Settings** zu erledigen:
    abschalten, wenn du sie nicht brauchst.
 5. **Push protection** – `Advanced Security` → `Push protection` aktivieren.
 
-## Auf dem iPhone installieren
+## Auf dem Handy installieren
 
-Pages-URL in **Safari** öffnen (nicht Chrome) → Teilen-Symbol → *Zum Home-Bildschirm*.
-Danach startet die Fahrzeugakte im Vollbild und funktioniert offline.
+**Android** (getestet auf Pixel 8 Pro): Pages-URL in Chrome öffnen → Menü →
+*App installieren*. Chrome bietet die Installation meist auch von selbst an.
+
+**iPhone / iPad**: Pages-URL in **Safari** öffnen (nicht Chrome, dort fehlt der
+Menüpunkt) → Teilen-Symbol → *Zum Home-Bildschirm*.
+
+Auf dem iPhone ist das Hinzufügen zum Home-Bildschirm nicht nur Bequemlichkeit,
+sondern Pflicht: Safari räumt den Speicher einer nur im Browser besuchten Seite
+nach sieben Tagen ohne Besuch ab. Für Web-Apps auf dem Home-Bildschirm gilt das
+nicht. Also installieren — oder regelmäßig sichern.
+
+## Plattform-Unterschiede
+
+Beides ist im Code berücksichtigt:
+
+| Thema | Android / Chrome | iOS / Safari |
+| --- | --- | --- |
+| TÜV-Monat | natives Monatsfeld | zwei Auswahlfelder, weil Safari `input[type=month]` nicht kennt |
+| Dateien ausgeben | Download | im Startbildschirm-Modus über das Teilen-Blatt, weil `<a download>` dort still scheitern kann |
+| PDF ansehen | Blob-Verweis | Blob-Verweis; `data:`-Verweise öffnet iOS nicht |
+| Speicher | IndexedDB, dauerhaft angefragt | IndexedDB; `persist()` fehlt, dafür schützt der Home-Bildschirm |
+
+Die Erkennung läuft über Funktionsprüfung, nicht über die Browserkennung — es
+wird also nichts anhand des Gerätenamens geraten.

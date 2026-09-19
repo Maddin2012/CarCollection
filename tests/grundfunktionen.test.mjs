@@ -26,6 +26,37 @@ export default async function ({ browser, base, ok }) {
   await page.waitForSelector('.head h2');
   ok((await page.textContent('.head h2')) === 'VW Golf', 'Fahrzeug angelegt und Karte sichtbar');
 
+  // --- Aufgeräumte Oberfläche ---
+  ok(await page.locator('#topBtn [data-a="editVehicle"] svg').count() === 1,
+    'Bearbeiten ist ein Stift-Icon in der Kopfzeile');
+  ok(await page.locator('[data-a="updateKm"]').count() === 0,
+    'Kein eigener Knopf für den Kilometerstand mehr');
+
+  await page.click('#back');
+  await page.waitForSelector('.mini');
+  ok(await page.locator('.mini .photo .plate').count() === 0,
+    'Kennzeichen steht nicht mehr im Bildbereich');
+  ok((await page.textContent('.mini .ms')).includes('M-AB 1234'),
+    'Kennzeichen steht in der Textzeile der Karte');
+  ok(await page.locator('#topBtn [data-a="addVehicle"]').count() === 0,
+    'Kein Hinzufügen-Knopf mehr oben in der Garage');
+  ok(await page.locator('.add[data-a="addVehicle"]').count() === 1,
+    'Die große Kachel zum Hinzufügen bleibt');
+
+  // --- Kein seitlicher Überlauf auf einem schmalen Gerät ---
+  // Ein umbruchunfähiges Element in der Fahrzeugkarte hat genau das schon
+  // einmal ausgelöst, ohne dass eine der übrigen Prüfungen angeschlagen hätte.
+  const passtInsFenster = () => page.evaluate(
+    () => document.documentElement.scrollWidth <= window.innerWidth);
+  await page.setViewportSize({ width: 360, height: 640 });
+  await page.waitForTimeout(120);
+  ok(await passtInsFenster(), 'Garage scrollt bei 360 px nicht seitlich');
+  await page.click('[data-a="open"]');
+  await page.waitForSelector('.head h2');
+  await page.waitForTimeout(120);
+  ok(await passtInsFenster(), 'Fahrzeugkarte scrollt bei 360 px nicht seitlich');
+  await page.setViewportSize({ width: 1280, height: 720 });
+
   // --- Logbuch-Eintrag ---
   await page.click('[data-a="tab"][data-k="log"]');
   await page.click('[data-a="addLog"]');

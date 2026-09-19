@@ -72,7 +72,10 @@ export default async function ({ browser, base, ok }) {
   await page.setViewportSize({ width: 1280, height: 720 });
 
   // --- Sicherung herunterladen ---
+  // Die Sicherung liegt seit Schritt 5 in den Einstellungen, nicht mehr in der Garage.
   await page.goBack();
+  await page.waitForSelector('.mini');
+  await page.click('[data-a="settings"]');
   await page.waitForSelector('[data-a="backupOut"]');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-a="backupOut"]')]);
   const file = await dl.path();
@@ -87,6 +90,10 @@ export default async function ({ browser, base, ok }) {
   ok(imgKeys.length === 1 && backup.images[imgKeys[0]].startsWith('data:image/'), 'Bilddaten sind eingebettet');
 
   // --- Alles löschen, als wäre es ein frisches Gerät ---
+  // Erst zurück in die Garage: Die Einstellungen überstehen seit Schritt 5 ein
+  // Neuladen, sonst stünde die App danach wieder dort statt vor leerer Garage.
+  await page.goBack();
+  await page.waitForSelector('.mini');
   await page.evaluate(async () => {
     const db = await new Promise(r => { const q = indexedDB.open('fahrzeugakte', 1); q.onsuccess = () => r(q.result); });
     await new Promise(r => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').clear(); t.oncomplete = r; });

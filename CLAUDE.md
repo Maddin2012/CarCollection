@@ -32,9 +32,20 @@ Fotos und Dokumente liegen ausschließlich im Browserspeicher. Niemals Fotos,
 Fahrzeugpapiere oder Rechnungen ins Repository committen. Keine Funktion
 einbauen, die Nutzerdaten irgendwohin überträgt, ohne das vorher zu besprechen.
 
-**Nach jeder Änderung an ausgelieferten Dateien `CACHE` in `sw.js` hochzählen**
-(`carcollection-v1` → `carcollection-v2`). Sonst liefert der Service Worker bei
-manchen Aufrufen weiter die alte Fassung aus dem Cache aus.
+**Nach jeder Änderung an ausgelieferten Dateien die Fassung an drei Stellen
+hochzählen — sie müssen immer dieselbe Zahl tragen:**
+
+| Stelle | sieht so aus |
+| --- | --- |
+| `CACHE` in `sw.js` | `carcollection-v6` → `carcollection-v7` |
+| `APP_VERSION` in `index.html` | `const APP_VERSION='7'` |
+| `version.json` | `{"version": "7", "datum": "…"}` |
+
+Bleibt `CACHE` stehen, liefert der Service Worker bei manchen Aufrufen weiter
+die alte Fassung aus. Bleibt eine der beiden anderen stehen, meldet die App in
+den Einstellungen entweder ewig ein Update oder verschweigt eines. Die CI
+vergleicht die drei Zahlen im Schritt `Fassungsnummern vergleichen` und bricht
+bei Abweichung ab — das ersetzt aber nicht, vorher selbst daran zu denken.
 
 **Plattform-Weichen über Funktionsprüfung, nie über die Browserkennung.** Die
 App läuft auf Android (Chrome) und iOS (Safari); beide Pfade sind in

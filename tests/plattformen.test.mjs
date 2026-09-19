@@ -36,6 +36,20 @@ const IOS_STANDALONE = () => {
   });
 };
 
+// Android-Chrome bietet das Teilen-Blatt für Dateien an, kennt aber kein
+// navigator.standalone und kann ebenso gut herunterladen.
+const ANDROID_SHARE = () => {
+  window.__shared = [];
+  Object.defineProperty(Navigator.prototype, 'canShare', {
+    configurable: true, writable: true,
+    value: d => !!(d && d.files && d.files.length)
+  });
+  Object.defineProperty(Navigator.prototype, 'share', {
+    configurable: true, writable: true,
+    value: async d => { window.__shared.push(d.files.map(f => ({ name: f.name, type: f.type, size: f.size }))); }
+  });
+};
+
 export default async function ({ browser, base, ok }) {
   const pdf = join(tmpdir(), 'carcollection-probe.pdf');
   writeFileSync(pdf, '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n'
@@ -114,6 +128,9 @@ export default async function ({ browser, base, ok }) {
 
     // --- Sicherung im Startbildschirm-Modus ---
     await page.goBack();
+    await page.waitForSelector('[data-a="settings"]');
+    await page.click('[data-a="settings"]');
+    await page.waitForSelector('[data-a="backupOut"]');
     await page.click('[data-a="backupOut"]');
     await page.waitForFunction(() => window.__shared.length > 2);
     shared = await page.evaluate(() => window.__shared);
@@ -145,8 +162,69 @@ export default async function ({ browser, base, ok }) {
     ok(/\.ics$/.test(ics.suggestedFilename()), `Kalendereintrag wird heruntergeladen: ${ics.suggestedFilename()}`);
 
     await page.goBack();
+    await page.waitForSelector('[data-a="settings"]');
+    await page.click('[data-a="settings"]');
+    await page.waitForSelector('[data-a="backupOut"]');
     const [bak] = await Promise.all([page.waitForEvent('download'), page.click('[data-a="backupOut"]')]);
     ok(/\.json$/.test(bak.suggestedFilename()), `Sicherung wird heruntergeladen: ${bak.suggestedFilename()}`);
+
+    ok(errors.length === 0, `Keine JS-Fehler${errors.length ? ': ' + errors.join(' | ') : ''}`);
+    await ctx.close();
+  }
+
+  // ------------------------------- Android: Teilen-Blatt, obwohl Download ginge
+  // Bis Schritt 5 griff das Teilen nur im Startbildschirm-Modus von iOS. Auf
+  // Android landete die Sicherung im Download-Ordner, wo man sie von Hand
+  // heraussuchen musste. Jetzt hat das Teilen-Blatt überall Vorrang, wo der
+  // Browser es für Dateien anbietet - navigator.standalone gibt es hier nicht.
+  {
+    const ctx = await browser.newContext({ acceptDownloads: true });
+    await ctx.addInitScript(ANDROID_SHARE);
+    const page = await ctx.newPage();
+    const errors = [];
+    watchErrors(page, errors);
+    await page.goto(base, { waitUntil: 'networkidle' });
+
+    ok(await page.evaluate(() => navigator.standalone === undefined),
+      'Kein Startbildschirm-Modus - es ist der gewöhnliche Android-Fall');
+    ok(await page.evaluate(() => 'download' in document.createElement('a')),
+      'Der Download wäre hier möglich - das Teilen hat trotzdem Vorrang');
+
+    await page.click('[data-a="addVehicle"]');
+    await page.fill('[name="name"]', 'Opel Kadett');
+    await page.click('[data-a="ok"]');
+    await page.waitForSelector('.head h2');
+    await page.goBack();
+    await page.waitForSelector('.mini');
+    await page.click('[data-a="settings"]');
+    await page.waitForSelector('[data-a="backupOut"]:not([disabled])');
+
+    // Kommt ein Download, ist das Teilen übergangen worden.
+    let heruntergeladen = false;
+    page.on('download', () => { heruntergeladen = true; });
+    await page.click('[data-a="backupOut"]');
+    await page.waitForFunction(() => window.__shared.length > 0);
+    const shared = await page.evaluate(() => window.__shared);
+    ok(/^carcollection-sicherung-\d{4}-\d{2}-\d{2}\.json$/.test(shared[0][0].name),
+      `Sicherung geht ins Teilen-Blatt: ${shared[0][0].name}`);
+    await page.waitForTimeout(400);
+    ok(!heruntergeladen, 'Und nicht zusätzlich in den Download-Ordner');
+
+    // --- Abgebrochenes Teilen lädt nicht ersatzweise herunter ---
+    await page.evaluate(() => {
+      navigator.share = async () => { const e = new Error('abgebrochen'); e.name = 'AbortError'; throw e; };
+    });
+    heruntergeladen = false;
+    await page.click('[data-a="backupOut"]');
+    await page.waitForTimeout(600);
+    ok(!heruntergeladen, 'Bricht man das Teilen ab, wird nichts heruntergeladen');
+
+    // --- Scheitert das Teilen anders, greift der Download als Rückfallebene ---
+    await page.evaluate(() => { navigator.share = async () => { throw new Error('kaputt'); }; });
+    const [dl] = await Promise.all([
+      page.waitForEvent('download'), page.click('[data-a="backupOut"]')]);
+    ok(/\.json$/.test(dl.suggestedFilename()),
+      `Scheitert das Teilen, wird heruntergeladen: ${dl.suggestedFilename()}`);
 
     ok(errors.length === 0, `Keine JS-Fehler${errors.length ? ': ' + errors.join(' | ') : ''}`);
     await ctx.close();

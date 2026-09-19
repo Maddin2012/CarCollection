@@ -111,6 +111,19 @@ nav button{background:none;border:0;padding:6px 0;display:flex;flex-direction:co
 nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 nav button.on{color:var(--accent)}
 
+/* Vollbildanzeige für Dokumente */
+body.noscroll{overflow:hidden}
+#full{position:fixed;inset:0;z-index:30;background:#070A10;display:flex;flex-direction:column}
+#full[hidden]{display:none}
+.fbar{flex:none;display:flex;align-items:center;gap:12px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:rgba(16,21,31,.9);border-bottom:1px solid var(--line)}
+.fbar .ft{flex:1;min-width:0}
+.fbar .ft b{display:block;font-family:var(--font);font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fbar .ft span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fimg{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+/* width/height statt max-*: ein kleiner Scan soll die Fläche auch ausfüllen,
+   sonst bleibt er so winzig wie vorher im Sheet. */
+.fimg img{width:100%;height:100%;object-fit:contain;touch-action:pinch-zoom}
+
 /* Sheet */
 #sheet{position:fixed;inset:0;z-index:20;display:none}
 #sheet.open{display:block}
@@ -146,6 +159,7 @@ input.upper{text-transform:uppercase}
 <div class="wrap" id="view"></div>
 <nav id="nav"></nav>
 <div id="sheet"></div>
+<div id="full" hidden></div>
 <input type="file" id="coverIn" accept="image/*" hidden>
 <input type="file" id="backupIn" accept="application/json,.json" hidden>
 
@@ -311,7 +325,8 @@ const ICONS={
   log:'<path d="M14.5 6.5a4 4 0 0 0-5 5L4 17l3 3 5.5-5.5a4 4 0 0 0 5-5l-2.5 2.5-2-.5-.5-2z"/>',
   doc:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
   part:'<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
-  edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>'
+  edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
+  close:'<path d="M6 6l12 12M18 6L6 18"/>'
 };
 const TABS=[['card','Karte'],['log','Logbuch'],['doc','Dokumente'],['part','Teile']];
 
@@ -486,6 +501,31 @@ const field=(label,name,val='',type='text',extra='')=>`<label>${label}</label><i
 const select=(label,name,arr,sel)=>`<label>${label}</label><select name="${name}">${opts(arr,sel)}</select>`;
 
 function bumpKm(k){ k=Number(k); if(k&&k>Number(S.v.km||0)) S.v.km=k; }
+
+/* ---------- Vollbildanzeige für Dokumente ---------- */
+let fullDoc=null;
+function openFull(doc,data){
+  fullDoc=doc;
+  const f=$('#full');
+  f.innerHTML=`<div class="fbar">
+      <button class="btn ghost ico" data-a="closeFull" aria-label="Schließen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button>
+      <div class="ft"><b>${esc(doc.title)}</b><span>${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}</span></div>
+      <button class="btn ghost danger" data-a="delFull">Löschen</button>
+    </div>
+    <div class="fimg" data-a="closeFull"><img alt="${esc(doc.title)}" src="${data}"></div>`;
+  f.hidden=false;
+  document.body.classList.add('noscroll');
+}
+function closeFull(){
+  const f=$('#full'); f.hidden=true; f.innerHTML=''; fullDoc=null;
+  document.body.classList.remove('noscroll');
+}
+// Ein Dokument samt Bilddatei entfernen - von beiden Ansichten aus derselbe Weg.
+async function removeDoc(doc){
+  S.docs=S.docs.filter(x=>x.id!==doc.id);
+  await store.del('img:'+doc.id); delete IMG['img:'+doc.id];
+  await save();
+}
 
 /* ---------- Sicherung ---------- */
 const BACKUP_TAG='carcollection';
@@ -691,12 +731,20 @@ const A={
   openDoc:async d=>{
     const doc=S.docs.find(x=>x.id===d.id); if(!doc) return;
     const data=await loadImg('img:'+doc.id);
-    const view=!data?'<p class="meta">Datei nicht gefunden.</p>':
-      doc.type==='pdf'?'<button class="btn primary" style="display:block;width:100%" data-a="savePdf">PDF öffnen oder sichern</button>'
-      :`<img alt="${esc(doc.title)}" src="${data}">`;
+    // Bilder gehören in die Vollbildanzeige - im Sheet bleibt von einem
+    // eingescannten Dokument zu wenig übrig, um etwas lesen zu können.
+    if(data&&doc.type==='image') return openFull(doc,data);
+    const view=!data?'<p class="meta">Datei nicht gefunden.</p>'
+      :'<button class="btn primary" style="display:block;width:100%" data-a="savePdf">PDF öffnen oder sichern</button>';
     pendingDoc=(data&&doc.type==='pdf')?{name:doc.title.replace(/[^\w -]+/g,'_')+'.pdf',data}:null;
     openSheet(doc.title,`<div class="viewer"><div class="meta">${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}</div>${view}</div>`,null,
-      async()=>{S.docs=S.docs.filter(x=>x.id!==doc.id);await store.del('img:'+doc.id);delete IMG['img:'+doc.id];await save();closeSheet();render();});
+      async()=>{await removeDoc(doc);closeSheet();render();});
+  },
+  closeFull:()=>closeFull(),
+  delFull:async(d,el)=>{
+    if(!el.dataset.armed){el.dataset.armed=1;el.textContent='Wirklich löschen?';return;}
+    if(!fullDoc) return;
+    await removeDoc(fullDoc); closeFull(); render();
   },
   savePdf:async()=>{
     if(!pendingDoc) return;
@@ -708,6 +756,11 @@ const A={
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-a]'); if(!el) return;
   const fn=A[el.dataset.a]; if(fn){e.stopPropagation();fn(el.dataset,el);}
+});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape') return;
+  if(!$('#full').hidden) closeFull();
+  else if($('#sheet').classList.contains('open')) closeSheet();
 });
 document.addEventListener('change',async e=>{
   const t=e.target;

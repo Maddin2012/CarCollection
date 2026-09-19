@@ -44,6 +44,33 @@ export default async function ({ browser, base, ok }) {
   await page.waitForSelector('.item');
   ok((await page.locator('.item').count()) === 1, 'Dokument mit Bild angelegt');
 
+  // --- Bild öffnet in Vollbild, nicht im Sheet ---
+  // #full trägt im geschlossenen Zustand das hidden-Attribut und ist damit nie
+  // "visible" - beim Warten darauf also ausdrücklich auf attached prüfen.
+  const zu = () => page.waitForSelector('#full[hidden]', { state: 'attached' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.click('[data-a="openDoc"]');
+  await page.waitForSelector('#full:not([hidden])');
+  ok(await page.locator('#sheet.open').count() === 0, 'Bild öffnet nicht im Sheet');
+  ok((await page.textContent('.fbar .ft b')) === 'TÜV-Bericht 2026', 'Vollbild nennt den Titel');
+  const gross = await page.evaluate(() => {
+    const i = document.querySelector('.fimg img'), f = document.getElementById('full');
+    const r = i.getBoundingClientRect(), fr = f.getBoundingClientRect();
+    return { breite: r.width / fr.width, hoehe: r.height / fr.height };
+  });
+  ok(gross.breite > 0.9, `Bild füllt die Breite (${Math.round(gross.breite * 100)} %)`);
+  ok(gross.hoehe > 0.5, `Bild nutzt die Höhe (${Math.round(gross.hoehe * 100)} %)`);
+
+  await page.keyboard.press('Escape');
+  await zu();
+  ok(await page.locator('#full[hidden]').count() === 1, 'Escape schließt die Vollbildanzeige');
+  await page.click('[data-a="openDoc"]');
+  await page.waitForSelector('#full:not([hidden])');
+  await page.click('[data-a="closeFull"]');
+  await zu();
+  ok((await page.locator('.item').count()) === 1, 'Schließen löscht das Dokument nicht');
+  await page.setViewportSize({ width: 1280, height: 720 });
+
   // --- Sicherung herunterladen ---
   await page.click('#back');
   await page.waitForSelector('[data-a="backupOut"]');

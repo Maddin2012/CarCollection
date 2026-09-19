@@ -102,6 +102,7 @@ export default async function ({ browser, base, ok }) {
     await page.waitForSelector('.item');
     await page.click('[data-a="openDoc"]');
     await page.waitForSelector('[data-a="savePdf"]');
+    ok(await page.locator('#full[hidden]').count() === 1, 'PDFs öffnen weiterhin im Sheet, nicht in Vollbild');
     ok(await page.locator('.viewer a[href^="data:"]').count() === 0, 'Kein data:-Verweis mehr für PDFs');
     await page.click('[data-a="savePdf"]');
     await page.waitForFunction(() => window.__shared.length > 1);

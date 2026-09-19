@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { REPO, watchErrors } from './lib.mjs';
+import { REPO, watchErrors, bildDurchwinken } from './lib.mjs';
 
 export const name = 'Sicherung';
 
@@ -38,6 +38,7 @@ export default async function ({ browser, base, ok }) {
   await page.click('[data-a="tab"][data-k="doc"]');
   await page.click('[data-a="addDoc"]');
   await page.setInputFiles('#fPick', join(REPO, 'icons/icon-512.png'));
+  await bildDurchwinken(page);
   await page.waitForSelector('#fname:not(:empty)');
   await page.fill('[name="title"]', 'TÜV-Bericht 2026');
   await page.click('[data-a="ok"]');

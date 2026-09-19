@@ -29,7 +29,8 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
 - **Logbuch** – Reparaturen, Wartungen und Umbauten mit Datum, Kilometerstand,
   Kategorie und Kosten. Belege lassen sich direkt am Eintrag anhängen.
 - **Dokumente** – Fahrzeugpapiere, TÜV-Berichte, Versicherung und Rechnungen als
-  Foto (Kamera-Scan) oder PDF, nach Kategorie gruppiert.
+  Foto oder PDF, nach Kategorie gruppiert. Fotos lassen sich vor dem Speichern
+  zuschneiden, geraderücken, drehen und aufhellen.
 - **Teile** – gekaufte Teile mit Kategorie, Status (verbaut / auf Lager /
   bestellt), Preis, Händler und Teilenummer.
 - **TÜV-Erinnerung** – Export eines `.ics`-Termins mit Erinnerungen 30 und
@@ -40,6 +41,36 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
 - **Einstellungen** – hinter dem Zahnrad oben rechts in der Garage: Sicherung
   speichern und einlesen, die laufende Fassung und die Update-Prüfung.
 - **Offline** – als Homescreen-App ohne Netz nutzbar.
+
+## Dokumente scannen
+
+Ein abfotografiertes Blatt ist schief, hat den Schreibtisch mit drauf und ist
+oft grau statt weiß. Deshalb schiebt sich zwischen Aufnahme und Speichern ein
+Zuschnitt — bei jedem Bild, gleich ob es von der Kamera oder aus der Galerie
+kommt. Für PDFs gibt es nichts geradezurücken, die gehen unverändert durch.
+
+**Erste Stufe – Zuschneiden.** Vier Griffe liegen auf den Bildkanten; du ziehst
+sie auf die Ecken des Blattes. Die App rechnet daraus die perspektivische
+Verzerrung heraus und schneidet den Rest weg. Daneben:
+
+- **Drehen** stellt ein quer aufgenommenes Blatt hochkant. Ein schon gesetzter
+  Zuschnitt dreht sich mit.
+- **Ganzes Bild** setzt die Griffe zurück auf die Kanten.
+
+**Zweite Stufe – Ergebnis.** Hier siehst du, was herauskommt, bevor es
+gespeichert wird. Der **Dokument-Modus** macht Graustufen daraus und spreizt den
+Kontrast, damit weißes Papier weiß und die Schrift schwarz wird. Abschaltbar —
+ein Foto eines Bauteils soll ein Foto bleiben.
+
+Wer nichts ändern will, tippt zweimal auf Übernehmen beziehungsweise Speichern.
+Liegen die Griffe unberührt auf den Kanten, wird das Bild gar nicht erst neu
+gerechnet; es bliebe sonst ohne Not etwas Schärfe auf der Strecke.
+
+Die Zurück-Geste schließt nur den Zuschnitt. Die Maske darunter bleibt stehen,
+samt allem, was du schon hineingeschrieben hast.
+
+Gerechnet wird alles in der App selbst — eine Homographie aus den vier Punkten,
+bilinear abgetastet. Keine Zusatzbibliothek, also auch ohne Netz.
 
 ## Belege am Logbuch-Eintrag
 

@@ -22,9 +22,28 @@ export default async function ({ browser, base, ok }) {
   await page.fill('[name="plate"]', 'M-AB 1234');
   await page.fill('[name="km"]', '123456');
   await page.fill('[name="tuev"]', '2026-11');
+  await page.fill('[name="vin"]', 'WVWZZZ1KZAW123456');
+  await page.fill('[name="hsn"]', '0603');
+  await page.fill('[name="tsn"]', 'bgx');
   await page.click('[data-a="ok"]');
   await page.waitForSelector('.head h2');
   ok((await page.textContent('.head h2')) === 'VW Golf', 'Fahrzeug angelegt und Karte sichtbar');
+
+  // --- Datenfelder der Karte ---
+  const karte = (await page.textContent('.stats')).replace(/\s+/g, ' ');
+  ok(karte.includes('WVWZZZ1KZAW123456'), 'FIN steht auf der Karte');
+  // Die Beschriftungen enthalten selbst Ziffern ("zu 2.1"), deshalb exakt prüfen
+  ok(/HSN \(zu 2\.1\)\s*0603/.test(karte), 'HSN steht auf der Karte');
+  ok(/TSN \(zu 2\.2\)\s*BGX/.test(karte), 'TSN steht auf der Karte, in Großbuchstaben');
+  ok(await page.evaluate(() => VEH[IDX[0]].v.tsn) === 'BGX', 'TSN wird in Großbuchstaben gespeichert');
+  for (const weg of ['Leistung', 'Hubraum', 'Kraftstoff']) {
+    ok(!karte.includes(weg), `${weg} steht nicht mehr auf der Karte`);
+  }
+  await page.click('[data-a="editVehicle"]');
+  ok(await page.locator('[name="power"]').count() === 1,
+    'Leistung ist in der Bearbeiten-Maske weiterhin erfassbar');
+  ok(await page.inputValue('[name="hsn"]') === '0603', 'HSN ist beim Bearbeiten vorbelegt');
+  await page.click('.panel .row [data-a="close"]');
 
   // --- Aufgeräumte Oberfläche ---
   ok(await page.locator('#topBtn [data-a="editVehicle"] svg').count() === 1,

@@ -74,7 +74,9 @@ button.card{display:block;width:100%;border:0;text-align:left;color:inherit;curs
 .stats{margin:16px 18px 0}
 .stat{display:flex;justify-content:space-between;align-items:baseline;padding:11px 0;border-top:1px solid var(--line)}
 .stat span{color:var(--muted);font-size:13px}
-.stat b{font-family:var(--font);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.stat b{font-family:var(--font);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;text-align:right;min-width:0;overflow-wrap:anywhere}
+/* Die FIN ist 17 Zeichen lang und würde sonst an die Beschriftung stoßen */
+.stat b.long{font-size:15px;letter-spacing:.02em}
 .pill{display:inline-block;font-family:var(--body);font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;margin-left:8px;vertical-align:middle;background:var(--surface2)}
 .pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.danger{color:var(--danger)}
 .foot{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);margin-top:6px;background:rgba(255,255,255,.02)}
@@ -121,6 +123,7 @@ nav button.on{color:var(--accent)}
 label{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 4px}
 input,select,textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:11px;padding:11px 12px;font:inherit;font-size:16px}
 textarea{min-height:64px;resize:vertical}
+input.upper{text-transform:uppercase}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
 .err{color:var(--danger);font-size:13px;margin-top:10px;min-height:0}
@@ -152,7 +155,7 @@ const DOCCATS=['Fahrzeugpapiere','TÜV / HU','Versicherung','Rechnungen',...PART
 const LOGTYPES=['Reparatur','Wartung','Umbau','Sonstiges'];
 const STATUS=['Verbaut','Auf Lager','Bestellt'];
 
-const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:''},logs:[],parts:[],docs:[],cover:false});
+const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:''},logs:[],parts:[],docs:[],cover:false});
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 const IMG={}; let persistent=true; const mem={};
@@ -369,13 +372,15 @@ function viewCard(){
   const ti=tuevInfo();
   const total=S.logs.reduce((a,l)=>a+Number(l.cost||0),0)+S.parts.reduce((a,p)=>a+Number(p.price||0),0);
   const dash='–';
+  // Leistung, Hubraum und Kraftstoff bleiben in der Bearbeiten-Maske erfassbar,
+  // stehen aber nicht mehr auf der Karte.
   const rows=[
     ['Kilometerstand',v.km?km(v.km):dash],
-    ['Leistung',v.power?v.power+' PS':dash],
-    ['Hubraum',v.displacement?Number(v.displacement).toLocaleString('de-DE')+' cm³':dash],
     ['Baujahr',v.year||dash],
-    ['Kraftstoff',v.fuel||dash],
-    ['TÜV bis',v.tuev?dt(v.tuev)+(ti?`<span class="pill ${ti.c}">${ti.t}</span>`:''):dash]
+    ['TÜV bis',v.tuev?dt(v.tuev)+(ti?`<span class="pill ${ti.c}">${ti.t}</span>`:''):dash],
+    ['FIN',v.vin?esc(v.vin):dash,'long'],
+    ['HSN (zu 2.1)',v.hsn?esc(v.hsn):dash],
+    ['TSN (zu 2.2)',v.tsn?esc(v.tsn):dash]
   ];
   return `
   <div class="card"><div class="card-in">
@@ -385,7 +390,7 @@ function viewCard(){
       <button class="edit" data-a="cover">${S.cover?'Bild ändern':'Foto wählen'}</button>
     </div>
     <div class="head"><h2>${has?esc(v.name):'Dein Fahrzeug'}</h2><p>${esc(v.variant)||(has?'':'Trage Marke, Modell und Daten ein.')}</p></div>
-    <div class="stats">${rows.map(r=>`<div class="stat"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('')}</div>
+    <div class="stats">${rows.map(r=>`<div class="stat"><span>${r[0]}</span><b${r[2]?' class="'+r[2]+'"':''}>${r[1]}</b></div>`).join('')}</div>
     <div class="foot">
       <div><b>${S.logs.length}</b><span>Einträge</span></div>
       <div><b>${S.docs.length}</b><span>Dokumente</span></div>
@@ -562,9 +567,13 @@ function vehicleSheet(isNew){
     `<div class="two">${field('Kraftstoff','fuel',v.fuel,'text','placeholder="Benzin, Diesel …"')}${field('Kilometerstand','km',v.km||'','number','inputmode="numeric"')}</div>`+
     (nativeMonth
       ?`<div class="two">${field('TÜV gültig bis','tuev',v.tuev,'month')}${field('FIN (optional)','vin',v.vin)}</div>`
-      :monthField('TÜV gültig bis','tuev',v.tuev)+field('FIN (optional)','vin',v.vin)),
+      :monthField('TÜV gültig bis','tuev',v.tuev)+field('FIN (optional)','vin',v.vin))+
+    // Schlüsselnummern aus der Zulassungsbescheinigung Teil I
+    `<div class="two">${field('HSN (zu 2.1)','hsn',v.hsn,'text','inputmode="numeric" maxlength="4" placeholder="4 Ziffern"')}${field('TSN (zu 2.2)','tsn',v.tsn,'text','maxlength="3" class="upper" placeholder="3 Zeichen"')}</div>`,
     async()=>{
       const o=normMonth(vals(),'tuev'); if(!o.name) return showErr('Bitte Marke und Modell eintragen.');
+      o.hsn=(o.hsn||'').replace(/\D/g,'').slice(0,4);
+      o.tsn=(o.tsn||'').toUpperCase().slice(0,3);
       if(isNew){const nv=newVeh(); nv.v={...nv.v,...o,km:Number(o.km||0)}; VEH[nv.id]=nv; IDX.push(nv.id); S=nv; view='vehicle'; tab='card';}
       else S.v={...S.v,...o,km:Number(o.km||0)};
       await save(); closeSheet(); render();

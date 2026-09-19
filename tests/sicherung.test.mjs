@@ -101,6 +101,21 @@ export default async function ({ browser, base, ok }) {
   await eingelesen();
   ok((await page.locator('.mini').count()) === 1, 'Zusammenführen legt kein Duplikat an');
 
+  // --- Sicherung ohne die neuen Felder bleibt lesbar ---
+  // Vor Schritt 2 kannte das Format hsn und tsn nicht.
+  const ohneFelder = JSON.parse(readFileSync(file, 'utf8'));
+  for (const fz of ohneFelder.vehicles) { delete fz.v.hsn; delete fz.v.tsn; }
+  const ohnePfad = join(tmpdir(), 'sicherung-ohne-schluesselnummern.json');
+  writeFileSync(ohnePfad, JSON.stringify(ohneFelder));
+  await page.setInputFiles('#backupIn', ohnePfad);
+  await page.waitForSelector('[data-a="restoreMerge"]', { timeout: 5000 }).catch(() => {});
+  ok(await page.locator('[data-a="restoreMerge"]').count() === 1,
+    'Sicherung ohne HSN und TSN wird angenommen');
+  await page.click('[data-a="restoreMerge"]');
+  await eingelesen();
+  ok(await page.evaluate(() => VEH[IDX[0]].v.hsn) === '',
+    'Fehlende Schlüsselnummern werden zu Leerwerten, nicht zu undefined');
+
   // --- Sicherung aus der Zeit vor der Umbenennung bleibt lesbar ---
   const alt = JSON.parse(readFileSync(file, 'utf8'));
   alt.app = 'fahrzeugakte';

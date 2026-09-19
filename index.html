@@ -34,6 +34,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .btn.ghost{background:transparent}
 .btn.danger{color:var(--danger);border-color:transparent}
 .btn[disabled]{opacity:.45;cursor:default}
+.btn.ico{padding:8px 10px;line-height:0}
+.btn.ico svg{display:block;width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .tl{display:flex;align-items:center;gap:10px}
 .back{padding:8px 12px;font-size:18px;line-height:1}
 .actions{flex-wrap:wrap}
@@ -41,12 +43,13 @@ button{font:inherit;color:inherit;cursor:pointer}
 button.card{display:block;width:100%;border:0;text-align:left;color:inherit;cursor:pointer}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .mini .photo{aspect-ratio:4/3}
-.mini .plate{font-size:11px;left:8px;top:8px;padding:2px 8px 2px 17px;background-size:8px 100%}
 .mini .mh{padding:0 12px;margin-top:-22px;position:relative;z-index:3}
 .mini .mh b{display:block;font-family:var(--font);font-size:18px;line-height:1.1}
 .mini .mh span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-.mini .ms{padding:8px 12px 12px;font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:6px}
-.mini .ms .pill{margin:0}
+.mini .ms{padding:8px 12px 0;font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:6px}
+.mini .ms.sub{padding:4px 12px 12px;flex-wrap:wrap;row-gap:3px}
+.mini .ms>span{white-space:nowrap}
+.mini .ms .pill{margin:0;font-size:10.5px;padding:2px 6px}
 .add{border:1.5px dashed var(--line);border-radius:22px;background:transparent;color:var(--muted);min-height:190px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:14px}
 .add b{font-family:var(--font);font-size:34px;color:var(--accent);line-height:1}
 .alert{margin-bottom:16px;border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:14px;background:var(--surface);overflow:hidden}
@@ -62,6 +65,8 @@ button.card{display:block;width:100%;border:0;text-align:left;color:inherit;curs
 .photo::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 55%,rgba(19,26,38,.95))}
 .photo .ph{position:relative;z-index:1;color:var(--muted);text-align:center;font-size:13px}
 .plate{position:absolute;z-index:2;left:12px;top:12px;background:#F2F4F8;color:#111;font-family:var(--font);font-weight:700;letter-spacing:.08em;padding:3px 10px 3px 20px;border-radius:6px;font-size:14px;border:1.5px solid #111;background-image:linear-gradient(#1D4FA3,#1D4FA3);background-size:10px 100%;background-repeat:no-repeat}
+/* Gleiches Schild, aber im Textfluss statt über dem Bild */
+.plate.flat{position:static;font-size:11px;padding:2px 7px 2px 15px;background-size:7px 100%;letter-spacing:.06em;border-width:1px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .photo .edit{position:absolute;z-index:2;right:10px;top:10px;background:rgba(16,21,31,.72);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:6px 10px;font-size:12px;color:var(--text)}
 .head{padding:0 18px;margin-top:-34px;position:relative;z-index:3}
 .head h2{margin:0;font-family:var(--font);font-size:30px;line-height:1.05;font-weight:700}
@@ -302,7 +307,8 @@ const ICONS={
   card:'<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M4 13h16M8 17h4"/>',
   log:'<path d="M14.5 6.5a4 4 0 0 0-5 5L4 17l3 3 5.5-5.5a4 4 0 0 0 5-5l-2.5 2.5-2-.5-.5-2z"/>',
   doc:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
-  part:'<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>'
+  part:'<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
+  edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>'
 };
 const TABS=[['card','Karte'],['log','Logbuch'],['doc','Dokumente'],['part','Teile']];
 
@@ -314,7 +320,9 @@ function render(){
   const titles={card:'CarCollection',log:'Logbuch',doc:'Dokumente',part:'Teile'};
   $('#title').textContent=titles[tab];
   $('#sub').textContent=tab==='card'?'':(S.v.name||'');
-  $('#topBtn').innerHTML=tab==='card'?'':`<button class="btn primary" data-a="${{log:'addLog',doc:'addDoc',part:'addPart'}[tab]}">Hinzufügen</button>`;
+  $('#topBtn').innerHTML=tab==='card'
+    ?`<button class="btn ghost ico" data-a="editVehicle" aria-label="Fahrzeugdaten bearbeiten"><svg viewBox="0 0 24 24">${ICONS.edit}</svg></button>`
+    :`<button class="btn primary" data-a="${{log:'addLog',doc:'addDoc',part:'addPart'}[tab]}">Hinzufügen</button>`;
   $('#view').innerHTML=({card:viewCard,log:viewLog,doc:viewDoc,part:viewPart})[tab]()+
     (persistent?'':'<p class="note warn">Hinweis: Speichern ist in dieser Umgebung nicht verfügbar. Daten gehen beim Schließen verloren.</p>');
   hydrateImages();
@@ -333,16 +341,17 @@ function tuevInfo(v=S.v){
 function renderGarage(){
   $('#nav').style.display='none'; $('#back').hidden=true;
   $('#title').textContent='Garage'; $('#sub').textContent=IDX.length?IDX.length+(IDX.length===1?' Fahrzeug':' Fahrzeuge'):'';
-  $('#topBtn').innerHTML=IDX.length?'<button class="btn primary" data-a="addVehicle">Fahrzeug hinzufügen</button>':'';
+  $('#topBtn').innerHTML='';
   const list=IDX.map(id=>VEH[id]);
   const due=list.filter(x=>{const i=tuevInfo(x.v);return i&&i.c!=='ok'});
   const banner=due.length?`<div class="alert" role="status">${due.map(x=>{const i=tuevInfo(x.v);return `<button data-a="open" data-id="${x.id}"><b>${esc(x.v.name||'Fahrzeug')}</b>: <span class="${i.c}">TÜV ${i.c==='danger'?'abgelaufen':'fällig'} (${i.t})</span></button>`}).join('')}</div>`:'';
   const cards=list.map(x=>{
     const i=tuevInfo(x.v);
     return `<button class="card mini" data-a="open" data-id="${x.id}"><div class="card-in">
-      <div class="photo" data-cover="${x.id}">${x.v.plate?`<div class="plate">${esc(x.v.plate)}</div>`:''}${x.cover?'':'<div class="ph">Kein Bild</div>'}</div>
+      <div class="photo" data-cover="${x.id}">${x.cover?'':'<div class="ph">Kein Bild</div>'}</div>
       <div class="mh"><b>${esc(x.v.name||'Fahrzeug')}</b><span>${esc(x.v.variant)||'&nbsp;'}</span></div>
-      <div class="ms"><span>${x.v.km?km(x.v.km):'–'}</span>${i?`<span class="pill ${i.c}">TÜV ${dt(x.v.tuev)}</span>`:''}</div>
+      <div class="ms">${x.v.plate?`<span class="plate flat">${esc(x.v.plate)}</span>`:'<span>Kein Kennzeichen</span>'}</div>
+      <div class="ms sub"><span>${x.v.km?km(x.v.km):'–'}</span>${i?`<span class="pill ${i.c}">TÜV ${dt(x.v.tuev)}</span>`:''}</div>
     </div></button>`}).join('');
   const backup=`<div class="actions">
       <button class="btn ghost" data-a="backupOut"${list.length?'':' disabled'}>Sicherung speichern</button>
@@ -384,11 +393,7 @@ function viewCard(){
       <div><b>${total?Math.round(total).toLocaleString('de-DE')+' €':dash}</b><span>Ausgaben</span></div>
     </div>
   </div></div>
-  <div class="actions">
-    <button class="btn" data-a="editVehicle">Fahrzeugdaten bearbeiten</button>
-    <button class="btn primary" data-a="updateKm">Kilometer aktualisieren</button>
-    ${v.tuev?'<button class="btn wide" data-a="tuevIcs">TÜV-Erinnerung im Kalender speichern</button>':''}
-  </div>`;
+  ${v.tuev?'<div class="actions"><button class="btn wide" data-a="tuevIcs">TÜV-Erinnerung im Kalender speichern</button></div>':''}`;
 }
 
 function viewLog(){
@@ -603,10 +608,6 @@ const A={
       'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:TÜV in 7 Tagen fällig','TRIGGER:-P7D','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
     await saveFile('TUEV-'+(S.v.plate||S.v.name||'Fahrzeug').replace(/[^\w-]+/g,'_')+'.ics',
       new Blob([ics],{type:'text/calendar;charset=utf-8'}));
-  },
-  updateKm:()=>{
-    openSheet('Kilometerstand',field('Aktueller Stand (km)','km',S.v.km||'','number','inputmode="numeric"'),
-      async()=>{const o=vals(); if(o.km==='') return showErr('Bitte einen Kilometerstand eintragen.'); S.v.km=Number(o.km); await save(); closeSheet(); render();});
   },
 
   backupOut:async()=>{

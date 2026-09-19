@@ -83,7 +83,7 @@ npm test
 ```
 
 Die Tests starten einen eigenen Webserver und fahren ein echtes Chromium gegen
-die App — 60 Prüfungen in drei Reihen:
+die App — drei Reihen:
 
 | Reihe | Prüft |
 | --- | --- |

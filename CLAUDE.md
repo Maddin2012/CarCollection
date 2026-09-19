@@ -57,7 +57,7 @@ Dazu die Browser-Tests — sie starten ihren eigenen Webserver, ein Aufruf genü
 
 ```sh
 npm ci                       # einmalig
-npm test                     # 60 Prüfungen in drei Reihen
+npm test                     # drei Reihen gegen ein echtes Chromium
 ```
 
 Läuft ein vorinstalliertes Chromium ausserhalb von Playwrights eigener Ablage,

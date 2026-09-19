@@ -148,6 +148,15 @@ input.upper{text-transform:uppercase}
 .panel .stats{margin:14px 0 0}
 .note{margin:14px 2px 0;color:var(--muted);font-size:12px;text-align:center}
 .note.warn{color:var(--warn)}
+
+/* Einstellungen */
+.sect{border:1px solid var(--line);background:var(--surface);border-radius:16px;padding:14px 16px 16px;margin-bottom:14px}
+.sect h2{margin:0;font-family:var(--font);font-size:19px}
+.sect .stats{margin:8px 0 0}
+.sect .stat b{font-size:16px}
+.sect .actions{margin-top:12px}
+.sect .note{text-align:left;margin:12px 0 0;line-height:1.5}
+.sect .note b{color:var(--text)}
 </style>
 </head>
 <body>
@@ -169,8 +178,12 @@ const LOGTYPES=['Reparatur','Wartung','Umbau','Sonstiges'];
 const STATUS=['Verbaut','Auf Lager','Bestellt'];
 
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:''},logs:[],parts:[],docs:[],cover:false});
+/* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
+   übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
+const APP_VERSION='6';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
+let updateReady='', updateNote='';
 const IMG={}; let persistent=true; const mem={};
 
 /* ---------- Speicher ----------
@@ -271,18 +284,22 @@ function normMonth(o,name){
   return o;
 }
 
-/* Eine Datei an den Nutzer geben. Im Startbildschirm-Modus auf dem iPhone
-   scheitert <a download> teils stillschweigend - dort ist das Teilen-Blatt
-   der verlässliche Weg. Überall sonst bleibt es beim gewohnten Download. */
+/* Eine Datei an den Nutzer geben. Das Teilen-Blatt hat überall dort Vorrang,
+   wo der Browser es für Dateien anbietet: Auf dem Handy führt es direkt nach
+   Drive oder in eine Nachricht, statt die Datei im Download-Ordner abzulegen,
+   wo man sie von Hand wieder heraussuchen müsste. Im Startbildschirm-Modus
+   auf dem iPhone scheitert <a download> ohnehin teils stillschweigend.
+   Der Download bleibt die Rückfallebene - auf dem Rechner ist er der Normalfall,
+   weil es dort kein Teilen-Blatt für Dateien gibt. */
 async function saveFile(name,blob){
   let file=null;
   try{ file=new File([blob],name,{type:blob.type}) }catch(e){}
-  const canShare=file&&navigator.canShare&&navigator.share&&navigator.canShare({files:[file]});
-  const a=document.createElement('a');
-  if(canShare&&(navigator.standalone===true||!('download' in a))){
+  if(file&&navigator.canShare&&navigator.share&&navigator.canShare({files:[file]})){
     try{ await navigator.share({files:[file]}); return true }
+    // Abgebrochen heißt abgebrochen - dann nicht hinterher doch herunterladen.
     catch(e){ if(e&&e.name==='AbortError') return true }
   }
+  const a=document.createElement('a');
   const url=URL.createObjectURL(blob);
   a.href=url; a.download=name; a.rel='noopener';
   document.body.appendChild(a); a.click(); a.remove();
@@ -325,12 +342,15 @@ const ICONS={
   doc:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
   part:'<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
   edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
-  close:'<path d="M6 6l12 12M18 6L6 18"/>'
+  close:'<path d="M6 6l12 12M18 6L6 18"/>',
+  // Zahnrad mit Zähnen statt Strahlen - sonst kaum vom Teile-Symbol zu unterscheiden
+  gear:'<circle cx="12" cy="12" r="3.4"/><path d="M12 2.6l1.5 2.2 2.6-.6.4 2.6 2.5 1-1.2 2.4 1.7 2-2.2 1.5.4 2.6-2.6.2-1.1 2.4-2-1.6-2 1.6-1.1-2.4-2.6-.2.4-2.6L2.5 12l1.7-2L3 7.6l2.5-1 .4-2.6 2.6.6z"/>'
 };
 const TABS=[['card','Karte'],['log','Logbuch'],['doc','Dokumente'],['part','Teile']];
 
 /* ---------- Rendering ---------- */
 function render(){
+  if(view==='settings') return renderSettings();
   if(view==='garage') return renderGarage();
   $('#nav').style.display='grid';
   $('#nav').innerHTML=TABS.map(([k,l])=>`<button data-a="tab" data-k="${k}" class="${tab===k?'on':''}"><svg viewBox="0 0 24 24">${ICONS[k]}</svg>${l}</button>`).join('');
@@ -358,7 +378,7 @@ function tuevInfo(v=S.v){
 function renderGarage(){
   $('#nav').style.display='none';
   $('#title').textContent='Garage'; $('#sub').textContent=IDX.length?IDX.length+(IDX.length===1?' Fahrzeug':' Fahrzeuge'):'';
-  $('#topBtn').innerHTML='';
+  $('#topBtn').innerHTML=`<button class="btn ghost ico" data-a="settings" aria-label="Einstellungen"><svg viewBox="0 0 24 24">${ICONS.gear}</svg></button>`;
   const list=IDX.map(id=>VEH[id]);
   const due=list.filter(x=>{const i=tuevInfo(x.v);return i&&i.c!=='ok'});
   const banner=due.length?`<div class="alert" role="status">${due.map(x=>{const i=tuevInfo(x.v);return `<button data-a="open" data-id="${x.id}"><b>${esc(x.v.name||'Fahrzeug')}</b>: <span class="${i.c}">TÜV ${i.c==='danger'?'abgelaufen':'fällig'} (${i.t})</span></button>`}).join('')}</div>`:'';
@@ -370,15 +390,79 @@ function renderGarage(){
       <div class="ms">${x.v.plate?`<span class="plate flat">${esc(x.v.plate)}</span>`:'<span>Kein Kennzeichen</span>'}</div>
       <div class="ms sub"><span>${x.v.km?km(x.v.km):'–'}</span>${i?`<span class="pill ${i.c}">TÜV ${dt(x.v.tuev)}</span>`:''}</div>
     </div></button>`}).join('');
-  const backup=`<div class="actions">
-      <button class="btn ghost" data-a="backupOut"${list.length?'':' disabled'}>Sicherung speichern</button>
-      <button class="btn ghost" data-a="backupIn">Sicherung einlesen</button>
-    </div><p class="note">Die Sicherung enthält alle Fahrzeuge samt Fotos und Dokumenten. Sie ist dein einziges Backup und der Weg, die Akte auf ein anderes Gerät zu holen.</p>`;
-  $('#view').innerHTML=(list.length
+  // Die stille Update-Prüfung beim Start meldet sich nur, wenn es etwas gibt.
+  const upd=updateReady?`<div class="alert" role="status"><button data-a="settings"><b>Neue Fassung ${esc(updateReady)} liegt bereit</b><span> – App einmal schließen und neu öffnen.</span></button></div>`:'';
+  $('#view').innerHTML=upd+(list.length
     ?banner+`<div class="grid">${cards}<button class="add" data-a="addVehicle"><b>+</b>Fahrzeug hinzufügen</button></div>`
-    :`<div class="empty"><b>Deine Garage ist leer</b>Lege dein erstes Fahrzeug an. Jedes bekommt eine eigene Karte.</div><div class="actions"><button class="btn primary" data-a="addVehicle">Erstes Fahrzeug anlegen</button></div>`)+backup;
+    :`<div class="empty"><b>Deine Garage ist leer</b>Lege dein erstes Fahrzeug an. Jedes bekommt eine eigene Karte.</div><div class="actions"><button class="btn primary" data-a="addVehicle">Erstes Fahrzeug anlegen</button></div>`);
   (persistent||!IDX.length)||($('#view').insertAdjacentHTML('beforeend','<p class="note warn">Hinweis: Speichern ist in dieser Umgebung nicht verfügbar. Daten gehen beim Schließen verloren.</p>'));
   hydrateImages();
+}
+
+/* ---------- Einstellungen ----------
+   Eigener Bildschirm hinter dem Zahnrad in der Garage. Hier liegt alles, was
+   die App als Ganzes betrifft und nicht zu einem einzelnen Fahrzeug gehört. */
+function renderSettings(){
+  $('#nav').style.display='none';
+  $('#title').textContent='Einstellungen'; $('#sub').textContent='';
+  $('#topBtn').innerHTML=`<button class="btn ghost ico" data-a="closeSettings" aria-label="Einstellungen schließen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button>`;
+  // Ob das Teilen-Blatt zur Verfügung steht, entscheidet der Browser - nicht
+  // die Betriebssystem-Kennung. Deshalb hier eine Probe mit einer Testdatei.
+  let teilen=false;
+  try{ teilen=!!(navigator.canShare&&navigator.share&&navigator.canShare({files:[new File([''],'probe.json',{type:'application/json'})]})) }catch(e){}
+  $('#view').innerHTML=`
+    <section class="sect">
+      <h2>Sicherung</h2>
+      <div class="actions">
+        <button class="btn ghost" data-a="backupOut"${IDX.length?'':' disabled'}>Sicherung speichern</button>
+        <button class="btn ghost" data-a="backupIn">Sicherung einlesen</button>
+      </div>
+      <p class="note">Die Sicherung enthält alle Fahrzeuge samt Fotos und Dokumenten. Sie ist dein einziges Backup und der Weg, die Akte auf ein anderes Gerät zu holen.</p>
+      <p class="note" id="shareNote">${teilen
+        ?'Beim Speichern öffnet sich das Teilen-Blatt. Dort <b>Drive</b> wählen und den Ordner <b>Car Collection / Sicherung</b> ansteuern – dann liegt die Sicherung nicht nur auf diesem Gerät.'
+        :'Die Sicherung wird heruntergeladen. Leg sie danach selbst in Drive ab, damit sie nicht nur auf diesem Gerät liegt.'}</p>
+    </section>
+    <section class="sect">
+      <h2>Updates</h2>
+      <div class="stats">
+        <div class="stat"><span>Fassung</span><b>${esc(APP_VERSION)}</b></div>
+        <div class="stat"><span>Speicher</span><b>${persistent?'dauerhaft':'flüchtig'}</b></div>
+      </div>
+      <div class="actions"><button class="btn ghost wide" data-a="checkUpdate">Nach Updates suchen</button></div>
+      ${updateNote?`<p class="note" id="upNote">${esc(updateNote)}</p>`:''}
+    </section>
+    <section class="sect">
+      <h2>Deine Daten</h2>
+      <p class="note">Fahrzeugdaten, Fotos und Dokumente liegen ausschließlich in diesem Browser. Nichts davon wird irgendwohin übertragen. Löschst du die Websitedaten oder deinstallierst die App, sind sie weg – deshalb die Sicherung.</p>
+    </section>`;
+}
+
+/* Die Versionsdatei liegt im Netz, nicht im Cache: Der Service Worker lässt sie
+   ausdrücklich durch, sonst meldete die App ewig die Fassung von vorgestern.
+   "laut" steuert, ob auch ein Ergebnis ohne Neuigkeit angezeigt wird - beim
+   Start läuft die Prüfung still, auf Knopfdruck redet sie. */
+async function checkUpdate(laut){
+  try{
+    const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    const v=d&&d.version?String(d.version):'';
+    if(!v) throw new Error('version.json ohne Versionsangabe');
+    if(v!==APP_VERSION){
+      updateReady=v;
+      updateNote='Fassung '+v+' liegt bereit. Sie wird im Hintergrund geladen – danach die App einmal schließen und neu öffnen.';
+      const reg=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration();
+      if(reg) reg.update().catch(()=>{});
+    }else{
+      updateReady='';
+      if(!laut) return;
+      updateNote='Du hast die neueste Fassung.';
+    }
+  }catch(e){
+    if(!laut) return;      // still heißt still, auch wenn das Netz fehlt
+    updateNote='Prüfung nicht möglich – vermutlich keine Verbindung.';
+  }
+  render();
 }
 
 function viewCard(){
@@ -493,7 +577,8 @@ let sheetSave=null, sheetDel=null, pending=null, pendingDoc=null;
    Garage (Grundeintrag), Fahrzeug, und jedes offene Sheet beziehungsweise
    Vollbild. Der Reiterwechsel bekommt bewusst keinen - das Fahrzeug ist ein
    Bildschirm, die Reiter sind Ansichten darin. */
-const screenState=()=>view==='vehicle'&&S?{s:'vehicle',id:S.id,tab}:{s:'garage'};
+const screenState=()=>view==='settings'?{s:'settings'}
+  :(view==='vehicle'&&S?{s:'vehicle',id:S.id,tab}:{s:'garage'});
 let modalEntry=false;   // liegt gerade ein Modal-Eintrag obenauf?
 
 const pushScreen=()=>{history.pushState(screenState(),'');};
@@ -673,6 +758,10 @@ const A={
   cover:()=>$('#coverIn').click(),
 
   open:d=>{S=VEH[d.id];view='vehicle';tab='card';logFilter=partFilter='Alle';window._df='Alle';pushScreen();render();window.scrollTo(0,0)},
+  settings:()=>{S=null;view='settings';updateNote='';pushScreen();render();window.scrollTo(0,0)},
+  // Die Einstellungen sind ein Bildschirm wie jeder andere: Schließen heißt zurück.
+  closeSettings:()=>history.back(),
+  checkUpdate:(d,el)=>{ el.disabled=true; el.textContent='Wird geprüft …'; checkUpdate(true) },
   addVehicle:()=>vehicleSheet(true),
   editVehicle:()=>vehicleSheet(false),
   tuevIcs:async()=>{
@@ -795,6 +884,7 @@ addEventListener('popstate',e=>{
   modalEntry=false;
   closeFull(); closeSheet();
   if(st.s==='vehicle'&&VEH[st.id]){ S=VEH[st.id]; view='vehicle'; tab=st.tab||'card'; }
+  else if(st.s==='settings'){ S=null; view='settings'; }
   else if(st.s!=='modal'){ S=null; view='garage'; }
   render(); window.scrollTo(0,0);
 });
@@ -846,19 +936,19 @@ document.addEventListener('change',async e=>{
   // Nach einem Neuladen steht der zuletzt gezeigte Bildschirm noch im
   // History-Eintrag - den stellen wir wieder her, statt in die Garage zu
   // springen. Sonst verlöre ein Neuladen Fahrzeug und Reiter.
+  // Der Grundeintrag ist dabei immer die Garage, der Bildschirm kommt darüber:
+  // So führt Zurück nie aus der App heraus, solange man nicht in ihr steht.
   const st=history.state;
-  if(st&&st.s==='vehicle'&&VEH[st.id]){
-    S=VEH[st.id]; view='vehicle'; tab=st.tab||'card'; syncScreen();
-  }else{
-    // Grundeintrag ist die Garage. Gibt es nur ein Fahrzeug, startet die App
-    // darin - dessen Eintrag liegt dann darüber, zurück führt in die Garage.
-    history.replaceState({s:'garage'},'');
-    if(IDX.length===1){ S=VEH[IDX[0]]; view='vehicle'; pushScreen(); }
-  }
+  history.replaceState({s:'garage'},'');
+  if(st&&st.s==='vehicle'&&VEH[st.id]){ S=VEH[st.id]; view='vehicle'; tab=st.tab||'card'; pushScreen(); }
+  else if(st&&st.s==='settings'){ view='settings'; pushScreen(); }
+  else if(IDX.length===1){ S=VEH[IDX[0]]; view='vehicle'; pushScreen(); }
   render();
   // Service Worker: macht die Akte offline nutzbar (nur über http/https, nicht bei file://)
   if('serviceWorker' in navigator && location.protocol.startsWith('http')){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
+    // Still nachsehen, ob eine neuere Fassung ausliegt; meldet sich nur dann.
+    checkUpdate(false);
   }
 })();
 </script>

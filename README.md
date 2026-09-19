@@ -37,6 +37,8 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
 - **Zurück-Geste** – die Zurück-Geste des Handys geht einen Schritt zurück,
   statt die App zu schließen: offenes Sheet oder Vollbild zu, sonst zurück in
   die Garage. Der zuletzt gezeigte Reiter übersteht ein Neuladen.
+- **Einstellungen** – hinter dem Zahnrad oben rechts in der Garage: Sicherung
+  speichern und einlesen, die laufende Fassung und die Update-Prüfung.
 - **Offline** – als Homescreen-App ohne Netz nutzbar.
 
 ## Speicherung
@@ -60,7 +62,8 @@ dauerhafte Ablage an, damit der Browser die Akte bei Platzmangel nicht räumt.
 
 ## Sicherung
 
-In der Garage liegen unten zwei Schaltflächen:
+In den **Einstellungen** (Zahnrad oben rechts in der Garage) liegen zwei
+Schaltflächen:
 
 - **Sicherung speichern** – schreibt die komplette Akte in eine Datei
   `carcollection-sicherung-JJJJ-MM-TT.json`. Darin stecken alle Fahrzeuge,
@@ -78,6 +81,35 @@ ohne Bilder wäre nur eine halbe Sicherung.
 
 Das ist zugleich der einzige Weg, die Akte von einem Gerät auf ein anderes zu
 bringen, denn es gibt keine Synchronisation.
+
+### Wo die Datei landet
+
+Bietet der Browser das Teilen-Blatt für Dateien an — auf dem Handy ist das der
+Normalfall —, öffnet es sich beim Speichern. Von dort führt der Weg direkt nach
+Drive: **Drive wählen → Ordner `Car Collection / Sicherung`**. So liegt die
+Sicherung nicht nur auf dem Gerät, auf dem sie entstanden ist.
+
+Eine automatische Ablage in Drive ist bewusst nicht eingebaut: Sie ginge aus
+einer Web-App auf Android gar nicht (die dafür nötige File System Access API
+gibt es nur im Chrome auf dem Rechner), und eine echte Drive-Anbindung würde
+Fahrzeugdaten an Google senden. Das widerspräche dem Grundsatz oben.
+
+Auf dem Rechner gibt es kein Teilen-Blatt für Dateien; dort wird wie gewohnt
+heruntergeladen.
+
+## Updates
+
+Die Einstellungen zeigen unter **Updates** die laufende Fassung. Beim Start
+sieht die App still nach, ob auf dem Server eine neuere ausliegt — sie meldet
+sich nur, wenn es etwas gibt, und dann als Hinweis oben in der Garage. Der
+Knopf **Nach Updates suchen** macht dieselbe Prüfung auf Verlangen und sagt
+auch, wenn alles aktuell ist oder die Verbindung fehlt.
+
+Gefunden wird das über `version.json` im Repository. Die Datei wird bewusst nie
+aus dem Cache beantwortet, sonst meldete die App auf ewig die Fassung von
+vorgestern. Liegt eine neuere bereit, lädt der Service Worker sie im
+Hintergrund; sichtbar wird sie, nachdem die App einmal geschlossen und neu
+geöffnet wurde.
 
 ## Tests
 
@@ -119,15 +151,18 @@ python3 -m http.server 8765
 | `index.html` | die gesamte App: Markup, Styles und Logik |
 | `manifest.webmanifest` | Name, Farben und Icons der installierbaren App |
 | `sw.js` | Service Worker für den Offline-Betrieb |
+| `version.json` | die ausgelieferte Fassung, für die Update-Prüfung |
 | `icons/` | App-Icons (192, 512 und Apple-Touch-Icon) |
 | `tests/` | Browser-Tests, die die App wirklich bedienen |
 | `.github/workflows/checks.yml` | prüft bei jedem Pull Request Syntax, Dateien und Verhalten |
 
 ### Nach jeder Änderung an der App
 
-In `sw.js` die Konstante `CACHE` hochzählen (`carcollection-v1` →
-`carcollection-v2`). Sonst liefert der Service Worker bei manchen Aufrufen
-weiterhin die alte Fassung aus dem Cache aus.
+Die Fassung an drei Stellen hochzählen — sie müssen dieselbe Zahl tragen:
+`CACHE` in `sw.js`, `APP_VERSION` in `index.html` und `version.json`. Bleibt
+`CACHE` stehen, liefert der Service Worker bei manchen Aufrufen weiterhin die
+alte Fassung aus; bleibt eine der anderen stehen, meldet die App entweder ewig
+ein Update oder verschweigt eines. Die CI vergleicht die drei Zahlen.
 
 ## Einrichtung auf GitHub
 
@@ -168,7 +203,7 @@ Beides ist im Code berücksichtigt:
 | Thema | Android / Chrome | iOS / Safari |
 | --- | --- | --- |
 | TÜV-Monat | natives Monatsfeld | zwei Auswahlfelder, weil Safari `input[type=month]` nicht kennt |
-| Dateien ausgeben | Download | im Startbildschirm-Modus über das Teilen-Blatt, weil `<a download>` dort still scheitern kann |
+| Dateien ausgeben | Teilen-Blatt, Download als Rückfallebene | Teilen-Blatt; `<a download>` kann im Startbildschirm-Modus still scheitern |
 | PDF ansehen | Blob-Verweis | Blob-Verweis; `data:`-Verweise öffnet iOS nicht |
 | Speicher | IndexedDB, dauerhaft angefragt | IndexedDB; `persist()` fehlt, dafür schützt der Home-Bildschirm |
 

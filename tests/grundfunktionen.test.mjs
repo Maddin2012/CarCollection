@@ -120,8 +120,31 @@ export default async function ({ browser, base, ok }) {
     ok(await page.evaluate(u => fetch(u).then(r => r.status), i) === 200, `Icon erreichbar: ${i}`);
   }
 
-  // --- Offline ---
+  // --- Der Service Worker legt auch nicht vorab gespeicherte Dateien ab ---
+  // Das clone() lag einmal einen Mikrotask zu spät: Die Seite hatte den Körper
+  // dann schon gelesen, das Klonen warf einen TypeError und es landete nie
+  // etwas im Cache. Sichtbar war davon nichts, weil die sechs Dateien aus
+  // ASSETS schon beim Installieren abgelegt werden.
   await page.evaluate(() => navigator.serviceWorker.ready);
+  const imCache = u => page.evaluate(async u => {
+    for (const n of await caches.keys()) {
+      const c = await caches.open(n);
+      for (const r of await c.keys()) if (r.url.endsWith(u)) return true;
+    }
+    return false;
+  }, u);
+  ok(!(await imCache('/README.md')), 'README.md liegt vorher nicht im Cache');
+  await page.evaluate(() => fetch('README.md').then(r => r.text()));
+  await page.waitForFunction(async () => {
+    for (const n of await caches.keys()) {
+      const c = await caches.open(n);
+      for (const r of await c.keys()) if (r.url.endsWith('/README.md')) return true;
+    }
+    return false;
+  }, null, { timeout: 5000 }).catch(() => {});
+  ok(await imCache('/README.md'), 'Der Service Worker legt eine abgerufene Datei im Cache ab');
+
+  // --- Offline ---
   await ctx.setOffline(true);
   const page3 = await ctx.newPage();
   let offlineOk = true, status = null;

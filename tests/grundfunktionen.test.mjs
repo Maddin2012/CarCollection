@@ -51,7 +51,7 @@ export default async function ({ browser, base, ok }) {
   ok(await page.locator('[data-a="updateKm"]').count() === 0,
     'Kein eigener Knopf für den Kilometerstand mehr');
 
-  await page.click('#back');
+  await page.goBack();
   await page.waitForSelector('.mini');
   ok(await page.locator('.mini .photo .plate').count() === 0,
     'Kennzeichen steht nicht mehr im Bildbereich');
@@ -86,7 +86,12 @@ export default async function ({ browser, base, ok }) {
   ok((await page.locator('.item').count()) === 1, 'Logbuch-Eintrag gespeichert');
 
   // --- Neu laden: Daten müssen überleben ---
+  // Der zuletzt gezeigte Reiter steht im History-Eintrag und wird beim Start
+  // wiederhergestellt - nach dem Neuladen steht man also wieder im Logbuch.
   await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForSelector('[data-a="addLog"]');
+  ok((await page.locator('.item').count()) === 1, 'Logbuch-Eintrag überlebt Neuladen');
+  await page.click('[data-a="tab"][data-k="card"]');
   await page.waitForSelector('.head h2');
   ok((await page.textContent('.head h2')) === 'VW Golf', 'Fahrzeug überlebt Neuladen');
   ok((await page.textContent('.head p')) === 'GTI Edition 35', 'Variante überlebt Neuladen');

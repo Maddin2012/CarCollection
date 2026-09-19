@@ -23,8 +23,9 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
 
 - **Garage** – Übersicht aller Fahrzeuge als Karten, mit Warnbanner für
   abgelaufenen oder bald fälligen TÜV.
-- **Fahrzeugkarte** – Titelbild, Kennzeichen, Kilometerstand, Leistung, Hubraum,
-  Baujahr, Kraftstoff, TÜV-Datum und eine Kostenübersicht.
+- **Fahrzeugkarte** – Titelbild, Kilometerstand, Baujahr, TÜV-Datum, FIN, HSN
+  und TSN sowie eine Kostenübersicht. Die übrigen Felder (Leistung, Hubraum,
+  Kraftstoff) bleiben in der Bearbeiten-Maske erfassbar.
 - **Logbuch** – Reparaturen, Wartungen und Umbauten mit Datum, Kilometerstand,
   Kategorie und Kosten.
 - **Dokumente** – Fahrzeugpapiere, TÜV-Berichte, Versicherung und Rechnungen als
@@ -33,6 +34,9 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
   bestellt), Preis, Händler und Teilenummer.
 - **TÜV-Erinnerung** – Export eines `.ics`-Termins mit Erinnerungen 30 und
   7 Tage vor Ablauf.
+- **Zurück-Geste** – die Zurück-Geste des Handys geht einen Schritt zurück,
+  statt die App zu schließen: offenes Sheet oder Vollbild zu, sonst zurück in
+  die Garage. Der zuletzt gezeigte Reiter übersteht ein Neuladen.
 - **Offline** – als Homescreen-App ohne Netz nutzbar.
 
 ## Speicherung

@@ -37,7 +37,6 @@ button{font:inherit;color:inherit;cursor:pointer}
 .btn.ico{padding:8px 10px;line-height:0}
 .btn.ico svg{display:block;width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .tl{display:flex;align-items:center;gap:10px}
-.back{padding:8px 12px;font-size:18px;line-height:1}
 .actions{flex-wrap:wrap}
 .actions .wide{flex:1 1 100%}
 button.card{display:block;width:100%;border:0;text-align:left;color:inherit;cursor:pointer}
@@ -153,7 +152,7 @@ input.upper{text-transform:uppercase}
 </head>
 <body>
 <div class="top">
-  <div class="tl"><button class="btn ghost back" id="back" data-a="garage" aria-label="Zur Garage" hidden>‹</button><div><h1 id="title">CarCollection</h1><small id="sub"></small></div></div>
+  <div class="tl"><div><h1 id="title">CarCollection</h1><small id="sub"></small></div></div>
   <div id="topBtn"></div>
 </div>
 <div class="wrap" id="view"></div>
@@ -333,7 +332,7 @@ const TABS=[['card','Karte'],['log','Logbuch'],['doc','Dokumente'],['part','Teil
 /* ---------- Rendering ---------- */
 function render(){
   if(view==='garage') return renderGarage();
-  $('#nav').style.display='grid'; $('#back').hidden=false;
+  $('#nav').style.display='grid';
   $('#nav').innerHTML=TABS.map(([k,l])=>`<button data-a="tab" data-k="${k}" class="${tab===k?'on':''}"><svg viewBox="0 0 24 24">${ICONS[k]}</svg>${l}</button>`).join('');
   const titles={card:'CarCollection',log:'Logbuch',doc:'Dokumente',part:'Teile'};
   $('#title').textContent=titles[tab];
@@ -357,7 +356,7 @@ function tuevInfo(v=S.v){
 }
 
 function renderGarage(){
-  $('#nav').style.display='none'; $('#back').hidden=true;
+  $('#nav').style.display='none';
   $('#title').textContent='Garage'; $('#sub').textContent=IDX.length?IDX.length+(IDX.length===1?' Fahrzeug':' Fahrzeuge'):'';
   $('#topBtn').innerHTML='';
   const list=IDX.map(id=>VEH[id]);
@@ -488,7 +487,37 @@ async function hydrateImages(){
 
 /* ---------- Sheet ---------- */
 let sheetSave=null, sheetDel=null, pending=null, pendingDoc=null;
+/* ---------- Navigation über die History ----------
+   Die Wischgeste des Handys soll einen Schritt zurückgehen, nicht die App
+   schließen. Dafür bekommt jede Ebene einen eigenen History-Eintrag:
+   Garage (Grundeintrag), Fahrzeug, und jedes offene Sheet beziehungsweise
+   Vollbild. Der Reiterwechsel bekommt bewusst keinen - das Fahrzeug ist ein
+   Bildschirm, die Reiter sind Ansichten darin. */
+const screenState=()=>view==='vehicle'&&S?{s:'vehicle',id:S.id,tab}:{s:'garage'};
+let modalEntry=false;   // liegt gerade ein Modal-Eintrag obenauf?
+
+const pushScreen=()=>{history.pushState(screenState(),'');};
+const syncScreen=()=>{history.replaceState(screenState(),'');};
+function pushModal(){ if(!modalEntry){ history.pushState({s:'modal'},''); modalEntry=true; } }
+
+/* Ein Modal zu schließen heißt zurückzugehen. Täte man es direkt, bliebe sein
+   Eintrag im Stapel stehen und die Geste liefe einmal ins Leere. */
+function dismissModal(){
+  if(modalEntry) history.back();      // schließen und zeichnen erledigt popstate
+  else { closeFull(); closeSheet(); render(); }
+}
+/* Für die Fälle, in denen das Schließen zugleich den Bildschirm wechselt:
+   Der Modal-Eintrag wird durch den neuen Bildschirm ersetzt, statt ihn
+   zurückzunehmen - sonst landete man auf dem alten Bildschirm. */
+function replaceModalWith(){
+  closeFull(); closeSheet();
+  modalEntry=false;
+  syncScreen();
+  render();
+}
+
 function openSheet(title,body,onSave,del){
+  pushModal();
   sheetSave=onSave; sheetDel=del||null; pending=null;
   $('#sheet').innerHTML=`<div class="scrim" data-a="close"></div><div class="panel" role="dialog" aria-label="${esc(title)}"><div class="grab"></div><h2>${esc(title)}</h2><div id="sbody">${body}</div><div class="err" id="err"></div>
   <div class="row">${del?'<button class="btn ghost danger" data-a="del">Löschen</button>':''}<button class="btn ghost" data-a="close">${onSave?'Abbrechen':'Schließen'}</button>${onSave?'<button class="btn primary" data-a="ok">Speichern</button>':''}</div></div>`;
@@ -505,6 +534,7 @@ function bumpKm(k){ k=Number(k); if(k&&k>Number(S.v.km||0)) S.v.km=k; }
 /* ---------- Vollbildanzeige für Dokumente ---------- */
 let fullDoc=null;
 function openFull(doc,data){
+  pushModal();
   fullDoc=doc;
   const f=$('#full');
   f.innerHTML=`<div class="fbar">
@@ -570,7 +600,7 @@ async function applyBackup(d,replace){
   }
   await saveIndex();
   pendingBackup=null; S=null; view='garage';
-  closeSheet(); render(); window.scrollTo(0,0);
+  replaceModalWith(); window.scrollTo(0,0);
   if(fail) alert(fail+' Bilder konnten nicht gespeichert werden. Der Speicher ist evtl. voll.');
 }
 
@@ -616,23 +646,25 @@ function vehicleSheet(isNew){
       o.tsn=(o.tsn||'').toUpperCase().slice(0,3);
       if(isNew){const nv=newVeh(); nv.v={...nv.v,...o,km:Number(o.km||0)}; VEH[nv.id]=nv; IDX.push(nv.id); S=nv; view='vehicle'; tab='card';}
       else S.v={...S.v,...o,km:Number(o.km||0)};
-      await save(); closeSheet(); render();
+      await save();
+      // Ein neues Fahrzeug wechselt den Bildschirm, das Bearbeiten nicht.
+      if(isNew) replaceModalWith(); else dismissModal();
     },
     isNew?null:async()=>{
       const id=S.id;
       for(const d of S.docs){await store.del('img:'+d.id);delete IMG['img:'+d.id];}
       await store.del(coverKey(id));delete IMG[coverKey(id)];await store.del('akte:v:'+id);
-      IDX=IDX.filter(x=>x!==id);delete VEH[id];S=null;view='garage';await saveIndex();closeSheet();render();
+      IDX=IDX.filter(x=>x!==id);delete VEH[id];S=null;view='garage';await saveIndex();replaceModalWith();
     });
 }
 
 /* ---------- Aktionen ---------- */
 const A={
-  tab:d=>{tab=d.k;render();window.scrollTo(0,0)},
+  tab:d=>{tab=d.k;syncScreen();render();window.scrollTo(0,0)},
   fLog:d=>{logFilter=d.k;render()},
   fPart:d=>{partFilter=d.k;render()},
   fDoc:d=>{window._df=d.k;render()},
-  close:closeSheet,
+  close:dismissModal,
   ok:()=>sheetSave&&sheetSave(),
   del:(d,el)=>{
     if(!el.dataset.armed){el.dataset.armed=1;el.textContent='Wirklich löschen?';return;}
@@ -640,8 +672,7 @@ const A={
   },
   cover:()=>$('#coverIn').click(),
 
-  garage:()=>{view='garage';render();window.scrollTo(0,0)},
-  open:d=>{S=VEH[d.id];view='vehicle';tab='card';logFilter=partFilter='Alle';window._df='Alle';render();window.scrollTo(0,0)},
+  open:d=>{S=VEH[d.id];view='vehicle';tab='card';logFilter=partFilter='Alle';window._df='Alle';pushScreen();render();window.scrollTo(0,0)},
   addVehicle:()=>vehicleSheet(true),
   editVehicle:()=>vehicleSheet(false),
   tuevIcs:async()=>{
@@ -686,9 +717,9 @@ const A={
       async()=>{
         const o=vals(); if(!o.title) return showErr('Bitte einen Titel eintragen.');
         if(isNew) S.logs.push({id:uid(),...o}); else Object.assign(l,o);
-        bumpKm(o.km); await save(); closeSheet(); render();
+        bumpKm(o.km); await save(); dismissModal();
       },
-      isNew?null:async()=>{S.logs=S.logs.filter(x=>x.id!==l.id);await save();closeSheet();render();});
+      isNew?null:async()=>{S.logs=S.logs.filter(x=>x.id!==l.id);await save();dismissModal();});
   },
 
   addPart:()=>A.editPart({}),
@@ -704,9 +735,9 @@ const A={
       async()=>{
         const o=vals(); if(!o.name) return showErr('Bitte eine Bezeichnung eintragen.');
         if(isNew) S.parts.push({id:uid(),...o}); else Object.assign(p,o);
-        await save(); closeSheet(); render();
+        await save(); dismissModal();
       },
-      isNew?null:async()=>{S.parts=S.parts.filter(x=>x.id!==p.id);await save();closeSheet();render();});
+      isNew?null:async()=>{S.parts=S.parts.filter(x=>x.id!==p.id);await save();dismissModal();});
   },
 
   addDoc:()=>{
@@ -723,7 +754,7 @@ const A={
         const ok=await store.set('img:'+id,pending.data);
         if(!ok) return showErr('Speichern fehlgeschlagen. Die Datei ist evtl. zu groß.');
         IMG['img:'+id]=pending.data;
-        S.docs.push({id,type:pending.type,...o}); await save(); closeSheet(); render();
+        S.docs.push({id,type:pending.type,...o}); await save(); dismissModal();
       });
   },
   pickCam:()=>$('#fCam').click(),
@@ -738,13 +769,13 @@ const A={
       :'<button class="btn primary" style="display:block;width:100%" data-a="savePdf">PDF öffnen oder sichern</button>';
     pendingDoc=(data&&doc.type==='pdf')?{name:doc.title.replace(/[^\w -]+/g,'_')+'.pdf',data}:null;
     openSheet(doc.title,`<div class="viewer"><div class="meta">${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}</div>${view}</div>`,null,
-      async()=>{await removeDoc(doc);closeSheet();render();});
+      async()=>{await removeDoc(doc);dismissModal();});
   },
-  closeFull:()=>closeFull(),
+  closeFull:()=>dismissModal(),
   delFull:async(d,el)=>{
     if(!el.dataset.armed){el.dataset.armed=1;el.textContent='Wirklich löschen?';return;}
     if(!fullDoc) return;
-    await removeDoc(fullDoc); closeFull(); render();
+    await removeDoc(fullDoc); dismissModal();
   },
   savePdf:async()=>{
     if(!pendingDoc) return;
@@ -757,10 +788,19 @@ document.addEventListener('click',e=>{
   const el=e.target.closest('[data-a]'); if(!el) return;
   const fn=A[el.dataset.a]; if(fn){e.stopPropagation();fn(el.dataset,el);}
 });
+/* Zurück-Geste und Zurück-Taste: den Zustand aus dem Eintrag herstellen,
+   statt die App zu verlassen. */
+addEventListener('popstate',e=>{
+  const st=e.state||{s:'garage'};
+  modalEntry=false;
+  closeFull(); closeSheet();
+  if(st.s==='vehicle'&&VEH[st.id]){ S=VEH[st.id]; view='vehicle'; tab=st.tab||'card'; }
+  else if(st.s!=='modal'){ S=null; view='garage'; }
+  render(); window.scrollTo(0,0);
+});
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape') return;
-  if(!$('#full').hidden) closeFull();
-  else if($('#sheet').classList.contains('open')) closeSheet();
+  if(!$('#full').hidden||$('#sheet').classList.contains('open')) dismissModal();
 });
 document.addEventListener('change',async e=>{
   const t=e.target;
@@ -803,7 +843,18 @@ document.addEventListener('change',async e=>{
   }
   for(const id of IDX){ const r=await store.get('akte:v:'+id); if(r){ try{VEH[id]=JSON.parse(r);}catch(e){} } }
   IDX=IDX.filter(id=>VEH[id]);
-  if(IDX.length===1){ S=VEH[IDX[0]]; view='vehicle'; }
+  // Nach einem Neuladen steht der zuletzt gezeigte Bildschirm noch im
+  // History-Eintrag - den stellen wir wieder her, statt in die Garage zu
+  // springen. Sonst verlöre ein Neuladen Fahrzeug und Reiter.
+  const st=history.state;
+  if(st&&st.s==='vehicle'&&VEH[st.id]){
+    S=VEH[st.id]; view='vehicle'; tab=st.tab||'card'; syncScreen();
+  }else{
+    // Grundeintrag ist die Garage. Gibt es nur ein Fahrzeug, startet die App
+    // darin - dessen Eintrag liegt dann darüber, zurück führt in die Garage.
+    history.replaceState({s:'garage'},'');
+    if(IDX.length===1){ S=VEH[IDX[0]]; view='vehicle'; pushScreen(); }
+  }
   render();
   // Service Worker: macht die Akte offline nutzbar (nur über http/https, nicht bei file://)
   if('serviceWorker' in navigator && location.protocol.startsWith('http')){

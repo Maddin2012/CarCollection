@@ -4,8 +4,9 @@ import { serve, launch, reporter } from './lib.mjs';
 import * as grundfunktionen from './grundfunktionen.test.mjs';
 import * as sicherung from './sicherung.test.mjs';
 import * as plattformen from './plattformen.test.mjs';
+import * as navigation from './navigation.test.mjs';
 
-const suiten = [grundfunktionen, sicherung, plattformen];
+const suiten = [grundfunktionen, sicherung, plattformen, navigation];
 
 const { base, close } = await serve();
 const browser = await launch();

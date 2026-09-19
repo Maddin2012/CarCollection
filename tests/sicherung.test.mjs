@@ -72,7 +72,7 @@ export default async function ({ browser, base, ok }) {
   await page.setViewportSize({ width: 1280, height: 720 });
 
   // --- Sicherung herunterladen ---
-  await page.click('#back');
+  await page.goBack();
   await page.waitForSelector('[data-a="backupOut"]');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-a="backupOut"]')]);
   const file = await dl.path();
@@ -121,7 +121,7 @@ export default async function ({ browser, base, ok }) {
   ok(thumb.startsWith('url("data:image/'), 'Dokumentenbild wiederhergestellt');
 
   // --- Zusammenführen darf nicht doppeln ---
-  await page.click('#back');
+  await page.goBack();
   await page.setInputFiles('#backupIn', file);
   await page.waitForSelector('[data-a="restoreMerge"]');
   await page.click('[data-a="restoreMerge"]');

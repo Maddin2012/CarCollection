@@ -39,3 +39,15 @@ jobs:
             if [ ! -f "$f" ]; then echo "fehlt: $f"; fehlt=1; fi
           done
           exit $fehlt
+
+      # Die Browser-Tests laufen bewusst im selben Job: Das Ruleset verlangt
+      # den Check unter genau diesem Namen. Ein eigener Job hieße anders und
+      # würde den Merge nicht blockieren, obwohl er im PR rot leuchtet.
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      - name: Chromium installieren
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser-Tests
+        run: npm test

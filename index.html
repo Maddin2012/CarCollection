@@ -4,7 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#10151F">
+<meta name="description" content="Fahrzeugakte: Garage, Logbuch, Dokumente und Teile für deine Fahrzeuge - alle Daten bleiben auf deinem Gerät.">
 <title>Fahrzeugakte</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fahrzeugakte">
 <style>
 :root{
   --bg:#10151F; --surface:#171E2B; --surface2:#1F2837; --line:#2C3649;
@@ -139,19 +147,63 @@ let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 const IMG={}; let persistent=true; const mem={};
 
-/* ---------- Speicher ---------- */
-const store={
-  async get(k){
-    if(window.storage){ try{const r=await window.storage.get(k); return r?r.value:null;}catch(e){return null;} }
-    persistent=false; return mem[k]??null;
+/* ---------- Speicher ----------
+   Reihenfolge: Host-API (Artifact-Umgebung) > IndexedDB > localStorage > Arbeitsspeicher.
+   Im Browser tragen die Daten in IndexedDB; localStorage ist nur der Notnagel,
+   weil Fotos als Data-URL dessen ~5-MB-Grenze schnell sprengen. */
+const DB='fahrzeugakte', KV='kv';
+let dbp=null;
+const idb=()=>dbp||(dbp=new Promise((res,rej)=>{
+  const rq=indexedDB.open(DB,1);
+  rq.onupgradeneeded=()=>rq.result.createObjectStore(KV);
+  rq.onsuccess=()=>res(rq.result);
+  rq.onerror=rq.onblocked=()=>rej(rq.error||new Error('IndexedDB nicht verfügbar'));
+}));
+const tx=(mode,fn)=>idb().then(db=>new Promise((res,rej)=>{
+  const t=db.transaction(KV,mode), rq=fn(t.objectStore(KV));
+  t.oncomplete=()=>res(rq?rq.result:undefined);
+  t.onabort=t.onerror=()=>rej(t.error||new Error('Speichern fehlgeschlagen'));
+}));
+
+const BACKENDS={
+  host:{
+    probe:()=>window.storage&&window.storage.get?window.storage.get('akte:probe'):Promise.reject(new Error('keine Host-API')),
+    get:k=>window.storage.get(k).then(r=>r?r.value:null),
+    set:(k,v)=>window.storage.set(k,v),
+    del:k=>window.storage.delete(k)
   },
-  async set(k,v){
-    if(window.storage){ try{await window.storage.set(k,v);return true;}catch(e){return false;} }
-    persistent=false; mem[k]=v; return true;
+  idb:{
+    probe:()=>window.indexedDB?tx('readwrite',s=>s.delete('akte:probe')):Promise.reject(new Error('kein IndexedDB')),
+    get:k=>tx('readonly',s=>s.get(k)).then(v=>v??null),
+    set:(k,v)=>tx('readwrite',s=>s.put(v,k)),
+    del:k=>tx('readwrite',s=>s.delete(k))
   },
-  async del(k){
-    if(window.storage){ try{await window.storage.delete(k);}catch(e){} } else delete mem[k];
+  ls:{
+    probe:async()=>{localStorage.setItem('akte:probe','1');localStorage.removeItem('akte:probe')},
+    get:async k=>localStorage.getItem(k),
+    set:async(k,v)=>localStorage.setItem(k,v),
+    del:async k=>localStorage.removeItem(k)
+  },
+  mem:{
+    probe:async()=>{},
+    get:async k=>mem[k]??null,
+    set:async(k,v)=>{mem[k]=v},
+    del:async k=>{delete mem[k]}
   }
+};
+let B=BACKENDS.mem;
+async function initStore(){
+  for(const n of ['host','idb','ls','mem']){
+    try{ await BACKENDS[n].probe(); B=BACKENDS[n]; break; }catch(e){}
+  }
+  persistent=B!==BACKENDS.mem;
+  // Dauerhafte Ablage anfragen, damit der Browser die Akte nicht bei Platzmangel räumt
+  if(persistent&&navigator.storage&&navigator.storage.persist){ try{await navigator.storage.persist()}catch(e){} }
+}
+const store={
+  async get(k){ try{return await B.get(k)}catch(e){return null} },
+  async set(k,v){ try{await B.set(k,v);return true}catch(e){return false} },
+  async del(k){ try{await B.del(k)}catch(e){} }
 };
 const saveIndex=()=>store.set('akte:index',JSON.stringify({ids:IDX}));
 const save=async()=>{await store.set('akte:v:'+S.id,JSON.stringify(S));await saveIndex();};
@@ -501,8 +553,11 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t.id==='coverIn'&&t.files[0]&&S){
-    try{const r=await fileToData(t.files[0],1200); IMG[coverKey(S.id)]=r.data; S.cover=true; await store.set(coverKey(S.id),r.data); await save(); render();}
-    catch(err){alert(err.message)}
+    try{
+      const r=await fileToData(t.files[0],1200);
+      if(!await store.set(coverKey(S.id),r.data)) throw new Error('Das Bild konnte nicht gespeichert werden. Der Speicher ist evtl. voll.');
+      IMG[coverKey(S.id)]=r.data; S.cover=true; await save(); render();
+    }catch(err){alert(err.message)}
     t.value='';
   }
   if((t.id==='fCam'||t.id==='fPick')&&t.files[0]){
@@ -514,6 +569,7 @@ document.addEventListener('change',async e=>{
 
 /* ---------- Start ---------- */
 (async()=>{
+  await initStore();
   const idx=await store.get('akte:index');
   if(idx){ try{IDX=JSON.parse(idx).ids||[];}catch(e){IDX=[];} }
   else{
@@ -529,6 +585,10 @@ document.addEventListener('change',async e=>{
   IDX=IDX.filter(id=>VEH[id]);
   if(IDX.length===1){ S=VEH[IDX[0]]; view='vehicle'; }
   render();
+  // Service Worker: macht die Akte offline nutzbar (nur über http/https, nicht bei file://)
+  if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
 })();
 </script>
 </body>

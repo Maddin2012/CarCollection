@@ -45,7 +45,13 @@ export function serve(root = REPO) {
 /* CHROMIUM_PATH setzen, wenn ein vorinstalliertes Chromium genutzt werden soll,
    das nicht zu Playwrights eigener Ablage gehört. Sonst sucht Playwright selbst. */
 export function launch() {
-  return chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
+  return chromium.launch({
+    ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
+    // Eine vorgespielte Kamera, damit der Scan-Weg wirklich durchlaufen wird und
+    // nicht nur das Vorhandensein von Schaltflächen geprüft ist. Geliefert wird
+    // ein bewegtes Farbbild in der angefragten Auflösung.
+    args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream']
+  });
 }
 
 export function reporter(name) {
@@ -95,6 +101,21 @@ export function png(w, h, malen) {
     chunk('IDAT', deflateSync(roh)),
     chunk('IEND', Buffer.alloc(0))
   ]);
+}
+
+/* Liegt an der Mitte dieser Schaltfläche wirklich sie selbst - oder deckt
+   etwas sie zu? Ein zu groß dargestelltes Bild hat genau das getan: Der Knopf
+   war da, sichtbar und aktiv, aber nicht zu treffen. Vorhandensein allein
+   belegt also nichts. */
+export function frei(page, selektor) {
+  return page.evaluate(s => {
+    const b = document.querySelector(s);
+    if (!b) return false;
+    const r = b.getBoundingClientRect();
+    if (!r.width || !r.height) return false;
+    const oben = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    return !!oben && (oben === b || b.contains(oben));
+  }, selektor);
 }
 
 /* Seit Schritt 7 schiebt sich der Zuschnitt zwischen Auswahl und Ablegen.

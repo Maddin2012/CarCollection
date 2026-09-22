@@ -4,7 +4,7 @@
    Ein Quellbild mit bekannten Ecken hinein, Pixel wieder heraus. Alles in
    index.html steht auf oberster Ebene und ist damit aus page.evaluate
    erreichbar - so greifen die übrigen Reihen schon auf VEH und store zu. */
-import { watchErrors, png } from './lib.mjs';
+import { watchErrors, png, frei } from './lib.mjs';
 
 export const name = 'Scan';
 
@@ -12,6 +12,12 @@ export const name = 'Scan';
 // sich eine Drehung nicht von einem Nichtstun unterscheiden.
 const QUELLE = png(300, 200, (x, y) => (x < 60 && y < 40) ? [0, 255, 0] : [250, 250, 250]);
 const BILD = { name: 'blatt.png', mimeType: 'image/png', buffer: QUELLE };
+
+// Ein Bild in der Größenordnung, die eine Handykamera liefert. Mit den kleinen
+// Vorlagen oben fiel nicht auf, dass die Anzeige über die Stufe hinauswuchs und
+// die Knöpfe darunter zudeckte.
+const GROSS = { name: 'grosses-blatt.png', mimeType: 'image/png',
+  buffer: png(2400, 1800, (x, y) => (x < 300 && y < 200) ? [0, 255, 0] : [250, 250, 250]) };
 
 export default async function ({ browser, base, ok }) {
   const ctx = await browser.newContext();
@@ -271,6 +277,50 @@ export default async function ({ browser, base, ok }) {
   await page.click('[data-a="ok"]');
   await page.waitForFunction(() => !document.getElementById('sheet').classList.contains('open'));
   ok(await page.evaluate(() => VEH[IDX[0]].docs.length === 2), 'Und wird mit dem Eintrag gespeichert');
+
+  // --- Ein großes Bild darf die Knöpfe nicht zudecken ---
+  // Der Zuschnitt nützt nichts, wenn "Übernehmen" unter dem Bild liegt.
+  await page.click('[data-a="tab"][data-k="doc"]');
+  await page.waitForSelector('[data-a="addDoc"]');
+  await page.click('[data-a="addDoc"]');
+  await page.setInputFiles('#fPick', GROSS);
+  await page.waitForSelector('#edit:not([hidden])');
+  for (const [b, h] of [[412, 915], [1280, 720], [900, 500]]) {
+    await page.setViewportSize({ width: b, height: h });
+    await page.waitForTimeout(150);
+    ok(await frei(page, '[data-a="editUeber"]'),
+      `Bei ${b}x${h} ist "Übernehmen" auch bei einem 2400x1800-Bild zu treffen`);
+    // Gemessen wird das Bild selbst, nicht der Rahmen: Der wird per CSS
+    // beschnitten und sähe auch dann richtig aus, wenn das Bild darunter
+    // hinausragt - und genau dann säßen die Ecken falsch.
+    const lage = await page.evaluate(() => {
+      const kasten = e => { const r = e.getBoundingClientRect();
+        return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }; };
+      const st = kasten(document.querySelector('.estage'));
+      const bild = kasten(document.querySelector('#ewrap canvas'));
+      const rahmen = kasten(document.querySelector('#ewrap'));
+      const g = kasten(document.querySelector('.ecorner[data-ecke="2"]'));
+      return { st, bild, rahmen, griffUR: { x: Math.round(g.x + g.w / 2), y: Math.round(g.y + g.h / 2) } };
+    });
+    ok(lage.bild.w <= lage.st.w + 1 && lage.bild.h <= lage.st.h + 1,
+      `Bei ${b}x${h} bleibt das Bild selbst in der Stufe (${lage.bild.w}x${lage.bild.h} in ${lage.st.w}x${lage.st.h})`);
+    ok(lage.rahmen.w === lage.bild.w && lage.rahmen.h === lage.bild.h
+      && lage.rahmen.x === lage.bild.x && lage.rahmen.y === lage.bild.y,
+      `Bei ${b}x${h} deckt sich der Rahmen mit dem Bild - nur dann sitzen die Griffe richtig`);
+    ok(Math.abs(lage.griffUR.x - (lage.bild.x + lage.bild.w)) <= 1
+      && Math.abs(lage.griffUR.y - (lage.bild.y + lage.bild.h)) <= 1,
+      `Bei ${b}x${h} sitzt der Griff unten rechts auf der Bildecke`);
+  }
+  await page.click('[data-a="editUeber"]');
+  await page.waitForSelector('[data-a="editSpeichern"]');
+  ok(await frei(page, '[data-a="editSpeichern"]'), 'Auch "Speichern" ist frei');
+  await page.click('[data-a="editAb"], [data-a="editZurueck"]');
+  await page.waitForSelector('[data-a="editUeber"]');
+  await page.goBack();
+  await page.waitForSelector('#edit[hidden]', { state: 'attached' });
+  await page.click('.panel .row [data-a="close"]');
+  await page.waitForFunction(() => !document.getElementById('sheet').classList.contains('open'));
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   // --- PDFs gehen weiterhin ohne Zuschnitt durch ---
   // Für ein PDF gibt es nichts geradezurücken.

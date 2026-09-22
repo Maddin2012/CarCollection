@@ -156,11 +156,11 @@ input.upper{text-transform:uppercase}
 .ebar .et{flex:1;min-width:0;text-align:center}
 .ebar .et b{display:block;font-family:var(--font);font-size:17px}
 .ebar .et span{display:block;color:var(--muted);font-size:12px}
-.estage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:14px;touch-action:none}
+.estage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:14px;touch-action:none;overflow:hidden}
 /* Der Rahmen sitzt exakt auf dem angezeigten Bild - die Griffe rechnen in
    Prozent davon, dann stimmen sie bei jeder Anzeigegröße. */
-.ewrap{position:relative;line-height:0;touch-action:none}
-.ewrap canvas{display:block;max-width:100%;max-height:100%;border-radius:4px}
+.ewrap{position:relative;line-height:0;touch-action:none;max-width:100%;max-height:100%}
+.ewrap canvas,.ewrap video{display:block;max-width:100%;max-height:100%;border-radius:4px;background:#000}
 .ewrap svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
 .ewrap svg polygon{fill:rgba(110,198,224,.14);stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke}
 /* 44 px Grifffläche - kleiner trifft man auf einem Handy nicht zuverlässig. */
@@ -214,7 +214,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='9';
+const APP_VERSION='10';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='', backupNote='';
@@ -819,7 +819,14 @@ function openSheet(title,body,onSave,del){
 }
 const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=pendingDoc=logDocs=null;};
 const vals=()=>{const o={};document.querySelectorAll('#sbody [name]').forEach(e=>o[e.name]=e.value.trim());return o;};
-const showErr=m=>{$('#err').textContent=m};
+/* Ohne offene Maske gäbe es sonst einen Fehler im Fehlerpfad - und die Meldung
+   käme nie an. Genau daran ließ sich auf dem Gerät nicht erkennen, was
+   schiefging: Es kam einfach nichts. */
+const showErr=m=>{
+  const el=$('#err');
+  if(el) el.textContent=m;
+  else if(m) alert(m);
+};
 const field=(label,name,val='',type='text',extra='')=>`<label>${label}</label><input name="${name}" type="${type}" value="${esc(val)}" ${extra}>`;
 const select=(label,name,arr,sel)=>`<label>${label}</label><select name="${name}">${opts(arr,sel)}</select>`;
 
@@ -899,26 +906,106 @@ function closeFull(){
 // Dann gibt es nichts geradezurücken und das Bild geht unverändert durch.
 let E=null;   // {arbeit, ecken, unberuehrt, stufe, ergebnis, ergebnisDok, dokModus, fertig}
 
+/* Eine laufende Kamera im Hintergrund ist ein echter Fehler, kein
+   Schönheitsmakel: Sie kostet Strom und die Anzeige am Gerät bleibt an.
+   Deshalb an jeder Stelle beendet, an der die Stufe verlassen wird. */
+function stromAus(){
+  if(E&&E.strom){ E.strom.getTracks().forEach(t=>t.stop()); E.strom=null; }
+}
+
 function closeEdit(){
+  stromAus();
   const l=$('#edit'); l.hidden=true; l.innerHTML=''; E=null;
   if($('#full').hidden) document.body.classList.remove('noscroll');
 }
 
 const eckenVoll=c=>[[0,0],[c.width,0],[c.width,c.height],[0,c.height]];
 
+const leerE=fertig=>({arbeit:null,ecken:null,unberuehrt:true,stufe:'crop',
+  ergebnis:null,ergebnisDok:null,dokModus:false,fertig,
+  strom:null,video:null,bereit:false,kameraFehler:''});
+
 function openEdit(canvas,fertig){
+  stromAus();                       // falls die Kamerastufe noch offen war
   pushModal('edit');
-  E={arbeit:canvas,ecken:eckenVoll(canvas),unberuehrt:true,stufe:'crop',
-     ergebnis:null,ergebnisDok:null,dokModus:false,fertig};
+  E=leerE(fertig);
+  E.arbeit=canvas; E.ecken=eckenVoll(canvas);
   document.body.classList.add('noscroll');
   $('#edit').hidden=false;
   renderEdit();
 }
 
+/* ---------- Die Kamera in der App ----------
+   Der Umweg über die Kamera-App von Android (input capture) kam auf dem Pixel
+   leer zurück - kein Foto, keine Meldung. Was dort geschieht, liegt außerhalb
+   der App. Nimmt sie das Bild selbst auf, gibt es keinen Wechsel mehr, bei dem
+   etwas verlorengehen kann. Der alte Weg bleibt als Rückfallebene. */
+const kameraGrund=err=>{
+  const n=err&&err.name;
+  return n==='NotAllowedError'?'Die Kamera ist für diese Seite nicht freigegeben. Erlaube den Zugriff in den Browser-Einstellungen.'
+    :n==='NotFoundError'?'Dieses Gerät meldet keine Kamera.'
+    :n==='NotReadableError'?'Die Kamera ist gerade von einer anderen App belegt.'
+    :n==='SecurityError'?'Die Kamera geht nur über eine gesicherte Verbindung.'
+    :'Die Kamera ließ sich nicht öffnen'+(n?' ('+n+')':'')+'.';
+};
+
+async function openKamera(fertig){
+  stromAus();
+  pushModal('edit');
+  E=leerE(fertig); E.stufe='kamera';
+  document.body.classList.add('noscroll');
+  $('#edit').hidden=false;
+  renderEdit();
+  try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)
+      throw Object.assign(new Error('keine Kamera'),{name:'NotFoundError'});
+    const strom=await navigator.mediaDevices.getUserMedia({video:{
+      facingMode:{ideal:'environment'},width:{ideal:2560},height:{ideal:1920}}});
+    // Zwischenzeitlich abgebrochen? Dann die Kamera nicht offen stehen lassen.
+    if(!E||E.stufe!=='kamera'){ strom.getTracks().forEach(t=>t.stop()); return; }
+    E.strom=strom;
+    const v=document.createElement('video');
+    v.muted=true; v.playsInline=true; v.setAttribute('playsinline','');
+    v.srcObject=strom;
+    E.video=v;
+    /* Erst wenn wirklich Bilddaten fließen, darf ausgelöst werden. Vorher war
+       der Auslöser schon freigegeben, während videoWidth noch 0 war - ein Tipp
+       darauf lief dann stumm ins Leere. */
+    const bereitMachen=()=>{ if(E&&E.video===v&&v.videoWidth){ E.bereit=true; renderEdit(); } };
+    v.addEventListener('loadeddata',bereitMachen);
+    v.addEventListener('canplay',bereitMachen);
+    renderEdit();
+    await v.play().catch(()=>{});
+    bereitMachen();
+  }catch(err){
+    if(!E) return;
+    E.kameraFehler=kameraGrund(err);
+    renderEdit();
+  }
+}
+
 function renderEdit(){
   if(!E) return;
   const l=$('#edit');
-  if(E.stufe==='crop'){
+  if(E.stufe==='kamera'){
+    const hatVideo=!!(E.video&&!E.kameraFehler);
+    const bereit=hatVideo&&E.bereit;
+    l.innerHTML=`<div class="ebar">
+        <button class="btn ghost ico" data-a="editAb" aria-label="Abbrechen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button>
+        <div class="et"><b>Scannen</b><span>${E.kameraFehler?'Kamera nicht verfügbar'
+          :bereit?'Blatt ins Bild rücken und auslösen':'Kamera wird geöffnet …'}</span></div>
+        <span style="width:37px"></span>
+      </div>
+      <div class="estage"><div class="ewrap" id="ewrap">${
+        E.kameraFehler?`<p class="ebusy">${esc(E.kameraFehler)}</p>`
+        :hatVideo?'':'<p class="ebusy">Kamera wird geöffnet …</p>'}</div></div>
+      <div class="etools">${E.kameraFehler
+        ?'<button class="btn primary" data-a="kameraApp">Kamera-App verwenden</button>'
+        :`<button class="btn primary" data-a="ausloesen"${bereit?'':' disabled'}>Auslösen</button>`}</div>`;
+    // Das <video> wird gehalten und wieder angehängt, nicht neu erzeugt -
+    // innerHTML risse es sonst samt laufendem Bild heraus.
+    if(hatVideo){ $('#ewrap').appendChild(E.video); passeEin(); }
+  }else if(E.stufe==='crop'){
     l.innerHTML=`<div class="ebar">
         <button class="btn ghost ico" data-a="editAb" aria-label="Abbrechen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button>
         <div class="et"><b>Zuschneiden</b><span>Ecken auf die Blattkanten ziehen</span></div>
@@ -934,8 +1021,10 @@ function renderEdit(){
     wrap.insertAdjacentHTML('beforeend',
       `<svg viewBox="0 0 ${E.arbeit.width} ${E.arbeit.height}" preserveAspectRatio="none"><polygon id="equad"/></svg>`+
       [0,1,2,3].map(i=>`<button class="ecorner" data-ecke="${i}" aria-label="Ecke ${i+1}"></button>`).join(''));
+    passeEin();
     zeichneEcken();
   }else{
+    // Stufe "ergebnis" - E.ergebnis steht hier immer, editUeber setzt es vorher.
     l.innerHTML=`<div class="ebar">
         <button class="btn ghost ico" data-a="editZurueck" aria-label="Zurück zum Zuschneiden"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button>
         <div class="et"><b>Ergebnis</b><span>${E.ergebnis.width} × ${E.ergebnis.height} Punkte</span></div>
@@ -947,6 +1036,7 @@ function renderEdit(){
         <button class="btn primary" data-a="editSpeichern">Speichern</button>
       </div>`;
     $('#ewrap').appendChild(ergebnisBild());
+    passeEin();
   }
 }
 
@@ -957,6 +1047,26 @@ function ergebnisBild(){
   if(!E.ergebnisDok) E.ergebnisDok=dokumentModus(E.ergebnis);
   return E.ergebnisDok;
 }
+
+/* Das angezeigte Bild genau in die Stufe einpassen.
+   Über CSS allein geht das nicht verlässlich: max-height:100% braucht eine
+   bestimmte Höhe am Elternteil, und die hat der Rahmen nicht. Bei einem breiten
+   Fenster wuchs das Bild dadurch über die Stufe hinaus und verdeckte die Knöpfe
+   darunter - der Auslöser war schlicht nicht mehr zu treffen. */
+function passeEin(){
+  const wrap=$('#ewrap'), medium=wrap&&wrap.firstElementChild;
+  const stufe=$('.estage');
+  if(!wrap||!medium||!stufe) return;
+  const bw=medium.videoWidth||medium.width, bh=medium.videoHeight||medium.height;
+  if(!bw||!bh) return;
+  const r=stufe.getBoundingClientRect();
+  const s=Math.min((r.width-28)/bw,(r.height-28)/bh);   // 14 px Rand je Seite
+  medium.style.width=Math.max(1,Math.floor(bw*s))+'px';
+  medium.style.height=Math.max(1,Math.floor(bh*s))+'px';
+}
+// Dreht man das Gerät, ändert sich die Stufe - die Griffe rechnen in Prozent
+// und wandern dann von selbst mit.
+addEventListener('resize',()=>{ if(E) passeEin(); });
 
 /* Die Griffe rechnen in Prozent des angezeigten Bildes, dann sitzen sie bei
    jeder Anzeigegröße richtig - auch nach dem Drehen. */
@@ -1271,7 +1381,9 @@ const A={
         S.docs.push({id,type:pending.type,...o}); await save(); dismissModal();
       });
   },
-  pickCam:()=>$('#fCam').click(),
+  // Die App nimmt selbst auf. docAufnehmen liest logDocs erst beim Aufruf aus -
+  // die Maske darunter bleibt ja offen, also landet das Bild am richtigen Ort.
+  pickCam:()=>openKamera(r=>docAufnehmen(r,'Aufnahme-'+today()+'.jpg')),
   pickFile:()=>$('#fPick').click(),
   openDoc:async d=>{
     const doc=S.docs.find(x=>x.id===d.id); if(!doc) return;
@@ -1285,6 +1397,22 @@ const A={
     openSheet(doc.title,`<div class="viewer"><div class="meta">${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}${docBezug(doc)}</div>${view}</div>`,null,
       async()=>{await removeDoc(doc);dismissModal();});
   },
+  // --- Kamera ---
+  ausloesen:()=>{
+    if(!E||!E.video||!E.video.videoWidth) return;
+    const v=E.video;
+    const s=Math.min(1,2000/Math.max(v.videoWidth,v.videoHeight));
+    const c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(v.videoWidth*s));
+    c.height=Math.max(1,Math.round(v.videoHeight*s));
+    c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+    stromAus(); E.video=null;        // das Bild ist im Kasten, die Kamera darf gehen
+    E.arbeit=c; E.ecken=eckenVoll(c); E.unberuehrt=true; E.stufe='crop';
+    renderEdit();
+  },
+  // Rückfallebene: der bisherige Weg über die Kamera-App des Geräts.
+  kameraApp:()=>{ stromAus(); if(E) E.video=null; $('#fCam').click(); },
+
   // --- Zuschnitt ---
   editAb:()=>dismissModal(),                 // Zurück, also nur diese Schicht zu
   editReset:()=>{ if(!E) return; E.ecken=eckenVoll(E.arbeit); E.unberuehrt=true; zeichneEcken(); },

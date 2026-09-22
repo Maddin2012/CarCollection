@@ -203,7 +203,7 @@ input.upper{text-transform:uppercase}
 <div id="full" hidden></div>
 <div id="edit" hidden></div>
 <input type="file" id="coverIn" accept="image/*" hidden>
-<input type="file" id="backupIn" accept="application/json,.json" hidden>
+<input type="file" id="backupIn" accept=".txt,.json,text/plain,application/json" hidden>
 
 <script>
 const PARTCATS=['Motor','Getriebe','Fahrwerk','Bremsen','Reifen','Felgen','Elektrik','Karosserie','Innenraum','Ersatzteile','Sonstiges'];
@@ -214,10 +214,10 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='8';
+const APP_VERSION='9';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
-let updateReady='', updateNote='';
+let updateReady='', updateNote='', backupNote='';
 const IMG={}; let persistent=true; const mem={};
 
 /* ---------- Speicher ----------
@@ -329,16 +329,27 @@ async function saveFile(name,blob){
   let file=null;
   try{ file=new File([blob],name,{type:blob.type}) }catch(e){}
   if(file&&navigator.canShare&&navigator.share&&navigator.canShare({files:[file]})){
-    try{ await navigator.share({files:[file]}); return true }
+    try{ await navigator.share({files:[file]}); return 'geteilt' }
     // Abgebrochen heißt abgebrochen - dann nicht hinterher doch herunterladen.
-    catch(e){ if(e&&e.name==='AbortError') return true }
+    catch(e){ if(e&&e.name==='AbortError') return 'abgebrochen' }
   }
   const a=document.createElement('a');
   const url=URL.createObjectURL(blob);
   a.href=url; a.download=name; a.rel='noopener';
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),3e4);
-  return true;
+  return 'geladen';
+}
+
+/* Ob der Browser das Teilen-Blatt für eine Datei dieser Art anbietet. Chrome
+   hat dafür eine feste Erlaubnisliste, auf der weder .json noch .ics stehen -
+   geprüft wird deshalb mit einer Probe genau des Typs, der später herausgeht,
+   nicht mit irgendeiner Datei. */
+function kannTeilen(name,typ){
+  try{
+    return !!(navigator.canShare&&navigator.share
+      &&navigator.canShare({files:[new File([''],name,{type:typ})]}));
+  }catch(e){ return false }
 }
 
 // data:-URL zurück in einen Blob; iOS öffnet data:-Verweise nicht.
@@ -593,9 +604,9 @@ function renderSettings(){
   $('#title').textContent='Einstellungen'; $('#sub').textContent='';
   $('#topBtn').innerHTML=`<button class="btn ghost ico" data-a="closeSettings" aria-label="Einstellungen schließen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button>`;
   // Ob das Teilen-Blatt zur Verfügung steht, entscheidet der Browser - nicht
-  // die Betriebssystem-Kennung. Deshalb hier eine Probe mit einer Testdatei.
-  let teilen=false;
-  try{ teilen=!!(navigator.canShare&&navigator.share&&navigator.canShare({files:[new File([''],'probe.json',{type:'application/json'})]})) }catch(e){}
+  // die Betriebssystem-Kennung. Geprüft wird mit genau der Art Datei, die
+  // später auch wirklich herausgeht.
+  const teilen=kannTeilen(backupName(),BACKUP_TYP);
   $('#view').innerHTML=`
     <section class="sect">
       <h2>Sicherung</h2>
@@ -605,8 +616,9 @@ function renderSettings(){
       </div>
       <p class="note">Die Sicherung enthält alle Fahrzeuge samt Fotos und Dokumenten. Sie ist dein einziges Backup und der Weg, die Akte auf ein anderes Gerät zu holen.</p>
       <p class="note" id="shareNote">${teilen
-        ?'Beim Speichern öffnet sich das Teilen-Blatt. Dort <b>Drive</b> wählen und den Ordner <b>Car Collection / Sicherung</b> ansteuern – dann liegt die Sicherung nicht nur auf diesem Gerät.'
+        ?'Beim Speichern öffnet sich das Teilen-Blatt. Dort <b>Drive</b> wählen und den Ordner <b>Car Collection / Sicherung</b> ansteuern – dann liegt die Sicherung nicht nur auf diesem Gerät. Die Datei endet auf <b>.txt</b>, weil Chrome nur solche Dateien teilt; ihr Inhalt ist unverändert.'
         :'Die Sicherung wird heruntergeladen. Leg sie danach selbst in Drive ab, damit sie nicht nur auf diesem Gerät liegt.'}</p>
+      ${backupNote?`<p class="note" id="bakNote">${esc(backupNote)}</p>`:''}
     </section>
     <section class="sect">
       <h2>Updates</h2>
@@ -996,6 +1008,14 @@ async function removeDoc(doc){
 const BACKUP_TAG='carcollection';
 // Sicherungen aus der Zeit, als die App noch Fahrzeugakte hieß, bleiben lesbar.
 const BACKUP_TAGS=[BACKUP_TAG,'fahrzeugakte'];
+/* Die Sicherung geht als Textdatei heraus, obwohl ihr Inhalt JSON ist: Chrome
+   teilt nur Dateien aus einer festen Erlaubnisliste (.txt, .csv, .pdf, Bilder,
+   Ton, Video) - .json steht nicht darauf. Als .json käme sie nie ins
+   Teilen-Blatt, sondern immer nur in den Download-Ordner. Beim Einlesen
+   entscheidet der Inhalt und nicht die Endung, alte .json-Sicherungen bleiben
+   also lesbar. */
+const BACKUP_TYP='text/plain';
+const backupName=()=>'carcollection-sicherung-'+today()+'.txt';
 let pendingBackup=null;
 
 async function collectBackup(){
@@ -1108,7 +1128,7 @@ const A={
   cover:()=>$('#coverIn').click(),
 
   open:d=>{S=VEH[d.id];view='vehicle';tab='card';logFilter=partFilter='Alle';window._df='Alle';pushScreen();render();window.scrollTo(0,0)},
-  settings:()=>{S=null;view='settings';updateNote='';pushScreen();render();window.scrollTo(0,0)},
+  settings:()=>{S=null;view='settings';updateNote=backupNote='';pushScreen();render();window.scrollTo(0,0)},
   // Die Einstellungen sind ein Bildschirm wie jeder andere: Schließen heißt zurück.
   closeSettings:()=>history.back(),
   checkUpdate:(d,el)=>{ el.disabled=true; el.textContent='Wird geprüft …'; checkUpdate(true) },
@@ -1129,12 +1149,22 @@ const A={
       new Blob([ics],{type:'text/calendar;charset=utf-8'}));
   },
 
-  backupOut:async()=>{
+  backupOut:async(d,el)=>{
     if(!IDX.length) return;
+    if(el){ el.disabled=true; el.textContent='Wird erstellt …'; }
     try{
-      const blob=new Blob([JSON.stringify(await collectBackup())],{type:'application/json'});
-      await saveFile('carcollection-sicherung-'+today()+'.json',blob);
-    }catch(err){ alert('Die Sicherung konnte nicht erstellt werden: '+err.message) }
+      const blob=new Blob([JSON.stringify(await collectBackup())],{type:BACKUP_TYP});
+      const weg=await saveFile(backupName(),blob);
+      // Der Rückfall auf den Download war bisher stumm - genau daran ließ sich
+      // nicht erkennen, warum kein Teilen-Blatt kam.
+      backupNote=weg==='geteilt'?'Die Sicherung ist im Teilen-Blatt. Wähle dort Drive.'
+        :weg==='abgebrochen'?'Abgebrochen – es wurde nichts gespeichert.'
+        :'Heruntergeladen. Das Teilen-Blatt bietet dein Browser für diese Datei nicht an.';
+    }catch(err){
+      backupNote='';
+      alert('Die Sicherung konnte nicht erstellt werden: '+err.message);
+    }
+    if(view==='settings') render();
   },
   backupIn:()=>$('#backupIn').click(),
   restoreMerge:()=>{ if(pendingBackup) applyBackup(pendingBackup,false) },

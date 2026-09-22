@@ -80,7 +80,7 @@ export default async function ({ browser, base, ok }) {
   await page.waitForSelector('[data-a="backupOut"]');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-a="backupOut"]')]);
   const file = await dl.path();
-  ok(/^carcollection-sicherung-\d{4}-\d{2}-\d{2}\.json$/.test(dl.suggestedFilename()),
+  ok(/^carcollection-sicherung-\d{4}-\d{2}-\d{2}\.txt$/.test(dl.suggestedFilename()),
     `Dateiname: ${dl.suggestedFilename()}`);
 
   const backup = JSON.parse(readFileSync(file, 'utf8'));

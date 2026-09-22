@@ -121,9 +121,12 @@ In den **Einstellungen** (Zahnrad oben rechts in der Garage) liegen zwei
 Schaltflächen:
 
 - **Sicherung speichern** – schreibt die komplette Akte in eine Datei
-  `carcollection-sicherung-JJJJ-MM-TT.json`. Darin stecken alle Fahrzeuge,
+  `carcollection-sicherung-JJJJ-MM-TT.txt`. Darin stecken alle Fahrzeuge,
   Logbuch-Einträge, Teile, Dokumente **und** die Bilder selbst (als Data-URL
   eingebettet). Die Datei ist damit alles, was du zum Wiederherstellen brauchst.
+  Der Inhalt ist JSON; die Endung `.txt` hat einen Grund, siehe unten. Ältere
+  Sicherungen mit der Endung `.json` lassen sich unverändert weiter einlesen —
+  erkannt wird am Inhalt, nicht am Namen.
 - **Sicherung einlesen** – zeigt erst, was in der Datei steckt, und fragt dann:
   - *Zusammenführen* behält die vorhandenen Fahrzeuge und überschreibt nur die,
     deren Kennung auch in der Sicherung vorkommt. Es entstehen keine Duplikate.
@@ -137,12 +140,23 @@ ohne Bilder wäre nur eine halbe Sicherung.
 Das ist zugleich der einzige Weg, die Akte von einem Gerät auf ein anderes zu
 bringen, denn es gibt keine Synchronisation.
 
-### Wo die Datei landet
+### Wo die Datei landet — und warum sie `.txt` heißt
 
-Bietet der Browser das Teilen-Blatt für Dateien an — auf dem Handy ist das der
-Normalfall —, öffnet es sich beim Speichern. Von dort führt der Weg direkt nach
-Drive: **Drive wählen → Ordner `Car Collection / Sicherung`**. So liegt die
-Sicherung nicht nur auf dem Gerät, auf dem sie entstanden ist.
+Beim Speichern öffnet sich auf dem Handy das Teilen-Blatt. Von dort führt der
+Weg direkt nach Drive: **Drive wählen → Ordner `Car Collection / Sicherung`**.
+So liegt die Sicherung nicht nur auf dem Gerät, auf dem sie entstanden ist.
+Nach dem Speichern sagt die App in einer Zeile, welchen Weg sie genommen hat.
+
+**Chrome teilt nur Dateien von einer festen Erlaubnisliste**
+(`chrome/browser/webshare/share_service_impl.cc`). Darauf stehen unter anderem
+`.txt`, `.csv`, `.pdf` und die gängigen Bild-, Ton- und Videoformate —
+**`.json` steht nicht darauf**. Als `.json` kam die Sicherung deshalb nie ins
+Teilen-Blatt, sondern immer nur in den Download-Ordner. Genau deshalb heißt sie
+jetzt `.txt`; am Inhalt ändert das nichts.
+
+Aus demselben Grund geht der **TÜV-Kalendereintrag** weiterhin in den Download:
+`.ics` steht ebenfalls nicht auf der Liste, und eine `.txt` ließe sich nicht in
+den Kalender übernehmen. Dort ist der Download der richtige Weg.
 
 Eine automatische Ablage in Drive ist bewusst nicht eingebaut: Sie ginge aus
 einer Web-App auf Android gar nicht (die dafür nötige File System Access API
@@ -258,7 +272,7 @@ Beides ist im Code berücksichtigt:
 | Thema | Android / Chrome | iOS / Safari |
 | --- | --- | --- |
 | TÜV-Monat | natives Monatsfeld | zwei Auswahlfelder, weil Safari `input[type=month]` nicht kennt |
-| Dateien ausgeben | Teilen-Blatt, Download als Rückfallebene | Teilen-Blatt; `<a download>` kann im Startbildschirm-Modus still scheitern |
+| Dateien ausgeben | Teilen-Blatt **nur für erlaubte Typen** (`.txt`, `.pdf`, Bilder …), sonst Download | Teilen-Blatt; `<a download>` kann im Startbildschirm-Modus still scheitern |
 | PDF ansehen | Blob-Verweis | Blob-Verweis; `data:`-Verweise öffnet iOS nicht |
 | Speicher | IndexedDB, dauerhaft angefragt | IndexedDB; `persist()` fehlt, dafür schützt der Home-Bildschirm |
 

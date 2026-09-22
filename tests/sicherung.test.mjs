@@ -54,13 +54,25 @@ export default async function ({ browser, base, ok }) {
   await page.waitForSelector('#full:not([hidden])');
   ok(await page.locator('#sheet.open').count() === 0, 'Bild öffnet nicht im Sheet');
   ok((await page.textContent('.fbar .ft b')) === 'TÜV-Bericht 2026', 'Vollbild nennt den Titel');
+  // Gemessen wird das Bild gegen die Fläche, in der es sitzt. Die frühere
+  // Prüfung verglich das <img>-Element mit dem Layer - und das Element nahm
+  // wegen width/height:100% immer die ganze Fläche ein, gleich wie groß das
+  // Bild darin erschien. Sie war grün aus dem falschen Grund: Die Vorlage ist
+  // quadratisch und füllte die Höhe nie zu 91 Prozent.
   const gross = await page.evaluate(() => {
-    const i = document.querySelector('.fimg img'), f = document.getElementById('full');
-    const r = i.getBoundingClientRect(), fr = f.getBoundingClientRect();
-    return { breite: r.width / fr.width, hoehe: r.height / fr.height };
+    const f = document.querySelector('.fimg'), i = f.querySelector('img');
+    const cs = getComputedStyle(f), r = f.getBoundingClientRect();
+    const fw = r.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const fh = r.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const ir = i.getBoundingClientRect();
+    return { fw, fh, iw: ir.width, ih: ir.height, verh: i.naturalWidth / i.naturalHeight };
   });
-  ok(gross.breite > 0.9, `Bild füllt die Breite (${Math.round(gross.breite * 100)} %)`);
-  ok(gross.hoehe > 0.5, `Bild nutzt die Höhe (${Math.round(gross.hoehe * 100)} %)`);
+  ok(gross.iw <= gross.fw + 1 && gross.ih <= gross.fh + 1,
+    `Bild bleibt in der Fläche (${Math.round(gross.iw)}x${Math.round(gross.ih)} in ${Math.round(gross.fw)}x${Math.round(gross.fh)})`);
+  ok(gross.iw >= gross.fw - 1 || gross.ih >= gross.fh - 1,
+    'Bild füllt die Fläche in mindestens einer Richtung aus');
+  ok(Math.abs(gross.iw / gross.ih - gross.verh) < 0.02,
+    'Bild behält sein Seitenverhältnis');
 
   await page.keyboard.press('Escape');
   await zu();

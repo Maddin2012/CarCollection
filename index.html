@@ -118,10 +118,13 @@ body.noscroll{overflow:hidden}
 .fbar .ft{flex:1;min-width:0}
 .fbar .ft b{display:block;font-family:var(--font);font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fbar .ft span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fimg{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
-/* width/height statt max-*: ein kleiner Scan soll die Fläche auch ausfüllen,
-   sonst bleibt er so winzig wie vorher im Sheet. */
-.fimg img{width:100%;height:100%;object-fit:contain;touch-action:pinch-zoom}
+.fimg{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom));touch-action:none;overflow:hidden}
+/* Das Bild bekommt seine Anzeigegröße gesetzt (einpassen), statt mit
+   object-fit die ganze Fläche einzunehmen. Dann ist das Element deckungsgleich
+   mit dem sichtbaren Bild: Ein Tipp daneben trifft .fimg und schließt, ein Tipp
+   darauf trifft das Bild - und die Grenzen fürs Schieben ergeben sich direkt
+   aus den Maßen. */
+.fimg img{display:block;transform-origin:center center;will-change:transform}
 
 /* Sheet */
 #sheet{position:fixed;inset:0;z-index:20;display:none}
@@ -214,7 +217,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='10';
+const APP_VERSION='11';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='', backupNote='';
@@ -889,14 +892,150 @@ function openFull(doc,data){
       <div class="ft"><b>${esc(doc.title)}</b><span>${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}${docBezug(doc)}</span></div>
       <button class="btn ghost danger" data-a="delFull">Löschen</button>
     </div>
-    <div class="fimg" data-a="closeFull"><img alt="${esc(doc.title)}" src="${data}"></div>`;
+    <div class="fimg"><img alt="${esc(doc.title)}" src="${data}"></div>`;
   f.hidden=false;
   document.body.classList.add('noscroll');
+  // Kein data-a="closeFull" mehr auf der Fläche: Ob ein Tipp schließt,
+  // entscheidet der Zeiger-Code, sobald feststeht, dass es keine Geste war.
+  const bild=f.querySelector('.fimg img');
+  V={bild,s:1,x:0,y:0,zeiger:new Map(),start:null,bewegt:false,aufBild:false};
+  if(bild.complete&&bild.naturalWidth) vollPassen();
+  else bild.addEventListener('load',vollPassen,{once:true});
 }
 function closeFull(){
-  const f=$('#full'); f.hidden=true; f.innerHTML=''; fullDoc=null;
+  const f=$('#full'); f.hidden=true; f.innerHTML=''; fullDoc=null; V=null;
   document.body.classList.remove('noscroll');
 }
+
+/* ---------- Vollbild: vergrößern und schieben ----------
+   Der Seitenzoom des Browsers steht in der installierten App nicht zur
+   Verfügung; touch-action:pinch-zoom erlaubt ihn nur, es macht ihn nicht. Ein
+   Fahrzeugschein ist im Ganzen aber nicht zu lesen - also bringt die App das
+   Vergrößern selbst mit.
+
+   Bewusst ohne setPointerCapture: Zuhörer auf window sind robuster, wenn das
+   Element neu gezeichnet wird, und nur so lassen sich zwei Finger überhaupt
+   prüfen - setPointerCapture verlangt einen echten Zeiger. */
+const V_MAX=6;
+let V=null;   // {bild, s, x, y, zeiger:Map, start, bewegt, aufBild}
+
+const vollAnwenden=()=>{ if(V) V.bild.style.transform=`translate(${V.x}px,${V.y}px) scale(${V.s})`; };
+
+// Die Fläche, in der das Bild sitzt - ohne Innenabstand, denn nur so weit
+// darf geschoben werden.
+function vollFlaeche(){
+  const f=$('.fimg'); if(!f) return null;
+  const r=f.getBoundingClientRect(), cs=getComputedStyle(f);
+  return {w:r.width-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight),
+          h:r.height-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom)};
+}
+
+/* Die Mitte des unverschobenen Bildes. Der Maßstab wirkt um die Mitte, also
+   verschiebt ihn nur die Verschiebung - die rechnen wir wieder heraus. */
+function vollMitte(){
+  const r=V.bild.getBoundingClientRect();
+  return [r.left+r.width/2-V.x, r.top+r.height/2-V.y];
+}
+
+// Nicht über den Rand hinaus: Ist das Bild kleiner als die Fläche, bleibt es
+// mittig; sonst darf höchstens der Überstand verschoben werden.
+function vollKlemmen(){
+  const fl=vollFlaeche(); if(!V||!fl) return;
+  if(V.s<=1){ V.x=0; V.y=0; return; }
+  const gx=Math.max(0,(V.bild.offsetWidth*V.s-fl.w)/2);
+  const gy=Math.max(0,(V.bild.offsetHeight*V.s-fl.h)/2);
+  V.x=Math.min(gx,Math.max(-gx,V.x));
+  V.y=Math.min(gy,Math.max(-gy,V.y));
+}
+
+function vollPassen(){
+  if(!V) return;
+  einpassen(V.bild,$('.fimg'),8);
+  vollKlemmen(); vollAnwenden();
+}
+
+/* Auf einen Punkt zoomen: Der Punkt unter den Fingern soll stehen bleiben.
+   Aus p = Mitte + Verschiebung + u·Maßstab folgt für den neuen Maßstab
+   Verschiebung' = (p − Mitte)·(1 − k) + Verschiebung·k  mit k = neu/alt. */
+function vollZoom(neu,px,py){
+  if(!V) return;
+  neu=Math.min(V_MAX,Math.max(1,neu));
+  const k=neu/V.s, c=vollMitte();
+  V.x=(px-c[0])*(1-k)+V.x*k;
+  V.y=(py-c[1])*(1-k)+V.y*k;
+  V.s=neu;
+  vollKlemmen(); vollAnwenden();
+}
+
+const vollAbstand=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+function vollStart(e){
+  const f=$('.fimg');
+  if(!V||!f||!f.contains(e.target)) return;
+  e.preventDefault();
+  V.zeiger.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  const z=[...V.zeiger.values()];
+  if(z.length===1){
+    V.bewegt=false;
+    V.aufBild=(e.target===V.bild);
+    V.start={x:e.clientX,y:e.clientY,tx:V.x,ty:V.y};
+  }else if(z.length===2){
+    V.bewegt=true;                       // zwei Finger sind nie ein Tipp
+    V.start={abstand:vollAbstand(z[0],z[1]),
+             mx:(z[0].x+z[1].x)/2,my:(z[0].y+z[1].y)/2,
+             s:V.s,tx:V.x,ty:V.y};
+  }
+}
+
+function vollBewegen(e){
+  if(!V||!V.zeiger.has(e.pointerId)||!V.start) return;
+  V.zeiger.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  const z=[...V.zeiger.values()];
+  if(z.length>=2&&V.start.abstand){
+    const ab=vollAbstand(z[0],z[1]);
+    const mx=(z[0].x+z[1].x)/2, my=(z[0].y+z[1].y)/2;
+    const neu=Math.min(V_MAX,Math.max(1,V.start.s*(ab/V.start.abstand)));
+    const k=neu/V.start.s, c=vollMitte();
+    V.s=neu;
+    // Zoom um den Punkt zwischen den Fingern, dazu das Wandern dieses Punktes.
+    V.x=(V.start.mx-c[0])*(1-k)+V.start.tx*k+(mx-V.start.mx);
+    V.y=(V.start.my-c[1])*(1-k)+V.start.ty*k+(my-V.start.my);
+  }else if(z.length===1){
+    const dx=z[0].x-V.start.x, dy=z[0].y-V.start.y;
+    if(Math.abs(dx)>4||Math.abs(dy)>4) V.bewegt=true;
+    if(V.s>1){ V.x=V.start.tx+dx; V.y=V.start.ty+dy; }
+  }
+  vollKlemmen(); vollAnwenden();
+}
+
+function vollEnde(e){
+  if(!V||!V.zeiger.has(e.pointerId)) return;
+  V.zeiger.delete(e.pointerId);
+  const z=[...V.zeiger.values()];
+  if(!z.length){
+    // Ein Tipp neben dem Bild schließt. Auf dem Bild passiert nichts - sonst
+    // ginge beim Schieben ständig etwas versehentlich zu.
+    const tipp=!V.bewegt&&!V.aufBild;
+    V.start=null;
+    if(tipp) dismissModal();
+  }else{
+    // Vom Zwei- auf den Einfingerbetrieb: neu ansetzen, sonst springt es.
+    V.start={x:z[0].x,y:z[0].y,tx:V.x,ty:V.y};
+  }
+}
+
+function vollRad(e){
+  const f=$('.fimg');
+  if(!V||!f||!f.contains(e.target)) return;
+  e.preventDefault();
+  vollZoom(V.s*(e.deltaY<0?1.2:1/1.2),e.clientX,e.clientY);
+}
+
+document.addEventListener('pointerdown',vollStart);
+addEventListener('pointermove',vollBewegen);
+addEventListener('pointerup',vollEnde);
+addEventListener('pointercancel',vollEnde);
+document.addEventListener('wheel',vollRad,{passive:false});
 
 /* ---------- Der Zuschnitt-Layer ----------
    Liegt über dem Sheet, aus dem er angestoßen wurde, und hat einen eigenen
@@ -1053,20 +1192,23 @@ function ergebnisBild(){
    bestimmte Höhe am Elternteil, und die hat der Rahmen nicht. Bei einem breiten
    Fenster wuchs das Bild dadurch über die Stufe hinaus und verdeckte die Knöpfe
    darunter - der Auslöser war schlicht nicht mehr zu treffen. */
-function passeEin(){
-  const wrap=$('#ewrap'), medium=wrap&&wrap.firstElementChild;
-  const stufe=$('.estage');
-  if(!wrap||!medium||!stufe) return;
-  const bw=medium.videoWidth||medium.width, bh=medium.videoHeight||medium.height;
+function einpassen(medium,flaeche,rand){
+  if(!medium||!flaeche) return;
+  const bw=medium.videoWidth||medium.naturalWidth||medium.width;
+  const bh=medium.videoHeight||medium.naturalHeight||medium.height;
   if(!bw||!bh) return;
-  const r=stufe.getBoundingClientRect();
-  const s=Math.min((r.width-28)/bw,(r.height-28)/bh);   // 14 px Rand je Seite
+  const r=flaeche.getBoundingClientRect();
+  const s=Math.min((r.width-2*rand)/bw,(r.height-2*rand)/bh);
   medium.style.width=Math.max(1,Math.floor(bw*s))+'px';
   medium.style.height=Math.max(1,Math.floor(bh*s))+'px';
 }
+function passeEin(){
+  const wrap=$('#ewrap');
+  einpassen(wrap&&wrap.firstElementChild,$('.estage'),14);
+}
 // Dreht man das Gerät, ändert sich die Stufe - die Griffe rechnen in Prozent
 // und wandern dann von selbst mit.
-addEventListener('resize',()=>{ if(E) passeEin(); });
+addEventListener('resize',()=>{ if(E) passeEin(); if(V) vollPassen(); });
 
 /* Die Griffe rechnen in Prozent des angezeigten Bildes, dann sitzen sie bei
    jeder Anzeigegröße richtig - auch nach dem Drehen. */

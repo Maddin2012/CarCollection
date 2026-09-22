@@ -25,6 +25,8 @@ export default async function ({ browser, base, ok }) {
   await page.fill('[name="name"]', 'VW Golf');
   await page.fill('[name="plate"]', 'M-AB 1234');
   await page.fill('[name="km"]', '123456');
+  await page.fill('[name="service"]', '2026-05-04');
+  await page.fill('[name="serviceKm"]', '120000');
   await page.click('[data-a="ok"]');
   await page.waitForSelector('.head h2');
 
@@ -99,6 +101,8 @@ export default async function ({ browser, base, ok }) {
   ok(backup.app === 'carcollection' && backup.version === 1, 'Sicherung trägt Kennung und Version');
   ok(backup.vehicles.length === 1, 'Ein Fahrzeug in der Sicherung');
   ok(backup.vehicles[0].logs.length === 1 && backup.vehicles[0].docs.length === 1, 'Logbuch und Dokument enthalten');
+  ok(backup.vehicles[0].v.service === '2026-05-04' && backup.vehicles[0].v.serviceKm === 120000,
+    'Der letzte Service steht in der Sicherung');
   const imgKeys = Object.keys(backup.images);
   ok(imgKeys.length === 1 && backup.images[imgKeys[0]].startsWith('data:image/'), 'Bilddaten sind eingebettet');
 
@@ -133,6 +137,7 @@ export default async function ({ browser, base, ok }) {
   await page.click('[data-a="open"]');
   await page.waitForSelector('.head h2');
   ok((await page.textContent('.stats')).includes('123.456 km'), 'Kilometerstand wiederhergestellt');
+  ok((await page.textContent('.stats')).includes('04.05.2026 · 120.000 km'), 'Letzter Service wiederhergestellt');
   ok((await page.textContent('.foot')).includes('781'), 'Kosten wiederhergestellt');
   await page.click('[data-a="tab"][data-k="doc"]');
   await page.waitForSelector('.item');
@@ -149,9 +154,12 @@ export default async function ({ browser, base, ok }) {
   ok((await page.locator('.mini').count()) === 1, 'Zusammenführen legt kein Duplikat an');
 
   // --- Sicherung ohne die neuen Felder bleibt lesbar ---
-  // Vor Schritt 2 kannte das Format hsn und tsn nicht.
+  // Vor Schritt 2 kannte das Format hsn und tsn nicht, vor Schritt 10 nicht
+  // service und serviceKm.
   const ohneFelder = JSON.parse(readFileSync(file, 'utf8'));
-  for (const fz of ohneFelder.vehicles) { delete fz.v.hsn; delete fz.v.tsn; }
+  for (const fz of ohneFelder.vehicles) {
+    delete fz.v.hsn; delete fz.v.tsn; delete fz.v.service; delete fz.v.serviceKm;
+  }
   const ohnePfad = join(tmpdir(), 'sicherung-ohne-schluesselnummern.json');
   writeFileSync(ohnePfad, JSON.stringify(ohneFelder));
   await page.setInputFiles('#backupIn', ohnePfad);
@@ -162,6 +170,8 @@ export default async function ({ browser, base, ok }) {
   await eingelesen();
   ok(await page.evaluate(() => VEH[IDX[0]].v.hsn) === '',
     'Fehlende Schlüsselnummern werden zu Leerwerten, nicht zu undefined');
+  ok(await page.evaluate(() => VEH[IDX[0]].v.service) === '',
+    'Auch ein fehlender Service wird zum Leerwert');
 
   // --- Sicherung aus der Zeit vor der Umbenennung bleibt lesbar ---
   const alt = JSON.parse(readFileSync(file, 'utf8'));

@@ -10,8 +10,9 @@ import * as logdokumente from './logdokumente.test.mjs';
 import * as scan from './scan.test.mjs';
 import * as kamera from './kamera.test.mjs';
 import * as vollbild from './vollbild.test.mjs';
+import * as karte from './karte.test.mjs';
 
-const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera, vollbild];
+const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera, vollbild, karte];
 
 const { base, close } = await serve();
 const browser = await launch();

@@ -50,6 +50,10 @@ export default async function ({ browser, base, ok }) {
     'Bearbeiten ist ein Stift-Icon in der Kopfzeile');
   ok(await page.locator('[data-a="updateKm"]').count() === 0,
     'Kein eigener Knopf für den Kilometerstand mehr');
+  // Seit Schritt 10 wird das Titelbild in der Bearbeiten-Maske geändert,
+  // nicht mehr über einen eigenen Knopf auf dem Bild.
+  ok(await page.locator('.photo .edit').count() === 0,
+    'Kein Knopf "Bild ändern" mehr auf dem Titelbild');
 
   await page.goBack();
   await page.waitForSelector('.mini');

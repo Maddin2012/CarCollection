@@ -60,13 +60,14 @@ button.card{display:block;width:100%;border:0;text-align:left;color:inherit;curs
 /* Karte */
 .card{padding:2px;border-radius:22px;background:linear-gradient(135deg,var(--foil1),var(--foil2) 28%,#F3E7BC 52%,#7A6731 78%,#E4D198);box-shadow:0 18px 40px rgba(0,0,0,.45)}
 .card-in{border-radius:20px;overflow:hidden;background:linear-gradient(180deg,#1A2231,#131A26)}
-.photo{position:relative;aspect-ratio:16/10;background:var(--surface2) center/cover no-repeat;display:flex;align-items:center;justify-content:center}
+/* 4/3 statt vormals 16/10: Die Karte war gedrungen, das sind rund 50 px mehr
+   Höhe - etwa zwei Datenzeilen. .mini .photo überschreibt das weiter unten. */
+.photo{position:relative;aspect-ratio:4/3;background:var(--surface2) center/cover no-repeat;display:flex;align-items:center;justify-content:center}
 .photo::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 55%,rgba(19,26,38,.95))}
 .photo .ph{position:relative;z-index:1;color:var(--muted);text-align:center;font-size:13px}
 .plate{position:absolute;z-index:2;left:12px;top:12px;background:#F2F4F8;color:#111;font-family:var(--font);font-weight:700;letter-spacing:.08em;padding:3px 10px 3px 20px;border-radius:6px;font-size:14px;border:1.5px solid #111;background-image:linear-gradient(#1D4FA3,#1D4FA3);background-size:10px 100%;background-repeat:no-repeat}
 /* Gleiches Schild, aber im Textfluss statt über dem Bild */
 .plate.flat{position:static;font-size:11px;padding:2px 7px 2px 15px;background-size:7px 100%;letter-spacing:.06em;border-width:1px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.photo .edit{position:absolute;z-index:2;right:10px;top:10px;background:rgba(16,21,31,.72);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:6px 10px;font-size:12px;color:var(--text)}
 .head{padding:0 18px;margin-top:-34px;position:relative;z-index:3}
 .head h2{margin:0;font-family:var(--font);font-size:30px;line-height:1.05;font-weight:700}
 .head p{margin:4px 0 0;color:var(--muted);font-size:14px}
@@ -184,6 +185,9 @@ input.upper{text-transform:uppercase}
 .dlist .d button{flex:none;background:none;border:0;color:var(--muted);padding:5px 6px;line-height:0}
 .dlist .d button svg{display:block;width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
 .dhint{color:var(--muted);font-size:12px;margin:8px 2px 0}
+/* Titelbild in der Bearbeiten-Maske: Vorschau im selben Seitenverhältnis wie
+   auf der Karte, damit man vor dem Speichern sieht, was ankommt. */
+.cbox{margin-top:6px;aspect-ratio:4/3;border-radius:12px;border:1px solid var(--line);background:var(--bg) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
 
 /* Einstellungen */
 .sect{border:1px solid var(--line);background:var(--surface);border-radius:16px;padding:14px 16px 16px;margin-bottom:14px}
@@ -214,10 +218,10 @@ const DOCCATS=['Fahrzeugpapiere','TÜV / HU','Versicherung','Rechnungen',...PART
 const LOGTYPES=['Reparatur','Wartung','Umbau','Sonstiges'];
 const STATUS=['Verbaut','Auf Lager','Bestellt'];
 
-const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:''},logs:[],parts:[],docs:[],cover:false});
+const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='11';
+const APP_VERSION='12';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='', backupNote='';
@@ -666,6 +670,21 @@ async function checkUpdate(laut){
   render();
 }
 
+/* Der letzte Service kommt aus zwei Quellen: dem jüngsten Logbuch-Eintrag der
+   Art "Wartung" und einem Feld in der Bearbeiten-Maske. Es gewinnt das jüngere
+   Datum - nicht pauschal das Handfeld. Sonst stünde nach dem nächsten
+   eingetragenen Service weiter der alte Handwert auf der Karte, und niemand
+   fände den Grund. Das Feld setzt damit den Anfangswert (ein Service aus der
+   Zeit vor der App) und tritt von selbst zurück, sobald das Logbuch weiter ist. */
+function letzterService(akte){
+  const a=akte||S;
+  const kandidaten=[];
+  if(a.v.service) kandidaten.push({date:a.v.service,km:a.v.serviceKm});
+  for(const l of a.logs) if(l.type==='Wartung'&&l.date) kandidaten.push({date:l.date,km:l.km});
+  if(!kandidaten.length) return null;
+  return kandidaten.reduce((a,b)=>(b.date>a.date?b:a));
+}
+
 function viewCard(){
   const v=S.v, has=v.name;
   const ti=tuevInfo();
@@ -673,20 +692,23 @@ function viewCard(){
   const dash='–';
   // Leistung, Hubraum und Kraftstoff bleiben in der Bearbeiten-Maske erfassbar,
   // stehen aber nicht mehr auf der Karte.
+  const serv=letzterService();
   const rows=[
     ['Kilometerstand',v.km?km(v.km):dash],
     ['Baujahr',v.year||dash],
     ['TÜV bis',v.tuev?dt(v.tuev)+(ti?`<span class="pill ${ti.c}">${ti.t}</span>`:''):dash],
+    ['Letzter Service',serv?dt(serv.date)+(serv.km?' · '+km(serv.km):''):dash,'long'],
     ['FIN',v.vin?esc(v.vin):dash,'long'],
     ['HSN (zu 2.1)',v.hsn?esc(v.hsn):dash],
     ['TSN (zu 2.2)',v.tsn?esc(v.tsn):dash]
   ];
   return `
   <div class="card"><div class="card-in">
-    <div class="photo" id="coverBox" data-a="cover">
+    <!-- Reine Anzeige: Geändert wird das Titelbild in der Bearbeiten-Maske
+         hinter dem Stift, zusammen mit allen anderen Fahrzeugdaten. -->
+    <div class="photo" id="coverBox">
       ${v.plate?`<div class="plate">${esc(v.plate)}</div>`:''}
-      ${S.cover?'':'<div class="ph">Titelbild hinzufügen</div>'}
-      <button class="edit" data-a="cover">${S.cover?'Bild ändern':'Foto wählen'}</button>
+      ${S.cover?'':'<div class="ph">Titelbild über den Stift oben rechts</div>'}
     </div>
     <div class="head"><h2>${has?esc(v.name):'Dein Fahrzeug'}</h2><p>${esc(v.variant)||(has?'':'Trage Marke, Modell und Daten ein.')}</p></div>
     <div class="stats">${rows.map(r=>`<div class="stat"><span>${r[0]}</span><b${r[2]?' class="'+r[2]+'"':''}>${r[1]}</b></div>`).join('')}</div>
@@ -820,7 +842,7 @@ function openSheet(title,body,onSave,del){
   <div class="row">${del?'<button class="btn ghost danger" data-a="del">Löschen</button>':''}<button class="btn ghost" data-a="close">${onSave?'Abbrechen':'Schließen'}</button>${onSave?'<button class="btn primary" data-a="ok">Speichern</button>':''}</div></div>`;
   $('#sheet').classList.add('open');
 }
-const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=pendingDoc=logDocs=null;};
+const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=pendingDoc=logDocs=pendingCover=null;};
 const vals=()=>{const o={};document.querySelectorAll('#sbody [name]').forEach(e=>o[e.name]=e.value.trim());return o;};
 /* Ohne offene Maske gäbe es sonst einen Fehler im Fehlerpfad - und die Meldung
    käme nie an. Genau daran ließ sich auf dem Gerät nicht erkennen, was
@@ -867,6 +889,22 @@ function docAufnehmen(r,dateiname){
     const ti=document.querySelector('#sbody [name=title]');
     if(ti&&!ti.value) ti.value=dateiname.replace(/\.[^.]+$/,'');
   }
+}
+
+/* ---------- Titelbild in der Bearbeiten-Maske ----------
+   Gehalten wird es nur, solange die Maske offen ist; geschrieben wird erst
+   beim Speichern. Sonst nähme ein Abbrechen das Bild nicht mehr zurück -
+   dasselbe Versprechen wie bei den Logbuch-Dokumenten. */
+let pendingCover=null;   // {id, data|null, weg:boolean} - data: neu gewählt
+
+function renderCoverBox(){
+  const box=$('#cbox'); if(!box||!pendingCover) return;
+  const neu=pendingCover.data;
+  const alt=!pendingCover.weg&&!neu&&IMG[coverKey(pendingCover.id)];
+  const bild=neu||alt;
+  box.style.backgroundImage=bild?`url(${bild})`:'';
+  box.textContent=bild?'':'Kein Titelbild';
+  const raus=$('#coverOff'); if(raus) raus.hidden=!bild;
 }
 
 function renderLogDocs(){
@@ -1335,7 +1373,13 @@ function askRestore(d){
 }
 
 function vehicleSheet(isNew){
-  const v=isNew?newVeh().v:S.v;
+  // Das Fahrzeug wird schon hier angelegt, nicht erst beim Speichern: Das
+  // Titelbild braucht die Kennung als Schlüssel, bevor gespeichert wird.
+  // Gespeichert wird es trotzdem erst mit dem Fahrzeug - wie beim
+  // Logbuch-Eintrag und seinen Anhängen.
+  const neu=isNew?newVeh():null;
+  const ziel=neu||S;
+  const v=ziel.v;
   openSheet(isNew?'Neues Fahrzeug':'Fahrzeugdaten',
     field('Marke und Modell','name',v.name,'text','placeholder="z. B. VW Golf"')+
     field('Variante','variant',v.variant,'text','placeholder="z. B. GTI Edition 35"')+
@@ -1346,13 +1390,28 @@ function vehicleSheet(isNew){
       ?`<div class="two">${field('TÜV gültig bis','tuev',v.tuev,'month')}${field('FIN (optional)','vin',v.vin)}</div>`
       :monthField('TÜV gültig bis','tuev',v.tuev)+field('FIN (optional)','vin',v.vin))+
     // Schlüsselnummern aus der Zulassungsbescheinigung Teil I
-    `<div class="two">${field('HSN (zu 2.1)','hsn',v.hsn,'text','inputmode="numeric" maxlength="4" placeholder="4 Ziffern"')}${field('TSN (zu 2.2)','tsn',v.tsn,'text','maxlength="3" class="upper" placeholder="3 Zeichen"')}</div>`,
+    `<div class="two">${field('HSN (zu 2.1)','hsn',v.hsn,'text','inputmode="numeric" maxlength="4" placeholder="4 Ziffern"')}${field('TSN (zu 2.2)','tsn',v.tsn,'text','maxlength="3" class="upper" placeholder="3 Zeichen"')}</div>`+
+    `<div class="two">${field('Letzter Service','service',v.service,'date')}${field('km beim Service','serviceKm',v.serviceKm||'','number','inputmode="numeric"')}</div>
+     <p class="dhint">Leer lassen, wenn der Service im Logbuch als Wartung steht – die Karte nimmt ihn von dort. Ein Datum hier ist für einen Service aus der Zeit vor der App; angezeigt wird immer das jüngere von beidem.</p>`+
+    `<label>Titelbild</label>
+     <div class="cbox" id="cbox"></div>
+     <div class="filebox"><button class="btn" data-a="cover">Foto wählen</button><button class="btn ghost danger" data-a="coverOff" id="coverOff" hidden>Entfernen</button></div>`,
     async()=>{
       const o=normMonth(vals(),'tuev'); if(!o.name) return showErr('Bitte Marke und Modell eintragen.');
       o.hsn=(o.hsn||'').replace(/\D/g,'').slice(0,4);
       o.tsn=(o.tsn||'').toUpperCase().slice(0,3);
-      if(isNew){const nv=newVeh(); nv.v={...nv.v,...o,km:Number(o.km||0)}; VEH[nv.id]=nv; IDX.push(nv.id); S=nv; view='vehicle'; tab='card';}
-      else S.v={...S.v,...o,km:Number(o.km||0)};
+      o.serviceKm=o.serviceKm?Number(o.serviceKm):'';
+      // Erst das Bild, dann das Fahrzeug: Scheitert das Ablegen, ist am
+      // Fahrzeug noch nichts geändert und die Maske bleibt stehen.
+      if(pendingCover&&pendingCover.data){
+        if(!await store.set(coverKey(ziel.id),pendingCover.data))
+          return showErr('Das Titelbild konnte nicht gespeichert werden. Der Speicher ist evtl. voll.');
+        IMG[coverKey(ziel.id)]=pendingCover.data; ziel.cover=true;
+      }else if(pendingCover&&pendingCover.weg){
+        await store.del(coverKey(ziel.id)); delete IMG[coverKey(ziel.id)]; ziel.cover=false;
+      }
+      ziel.v={...ziel.v,...o,km:Number(o.km||0)};
+      if(isNew){ VEH[ziel.id]=ziel; IDX.push(ziel.id); S=ziel; view='vehicle'; tab='card'; }
       await save();
       // Ein neues Fahrzeug wechselt den Bildschirm, das Bearbeiten nicht.
       if(isNew) replaceModalWith(); else dismissModal();
@@ -1363,6 +1422,11 @@ function vehicleSheet(isNew){
       await store.del(coverKey(id));delete IMG[coverKey(id)];await store.del('akte:v:'+id);
       IDX=IDX.filter(x=>x!==id);delete VEH[id];S=null;view='garage';await saveIndex();replaceModalWith();
     });
+  pendingCover={id:ziel.id,data:null,weg:false};
+  // Das Bild liegt nach dem Karten-Reiter meist schon in IMG; falls nicht,
+  // wird die Vorschau nachgezeichnet, sobald es da ist.
+  if(!isNew&&S.cover&&!IMG[coverKey(S.id)]) loadImg(coverKey(S.id)).then(renderCoverBox);
+  renderCoverBox();
 }
 
 /* ---------- Aktionen ---------- */
@@ -1377,7 +1441,9 @@ const A={
     if(!el.dataset.armed){el.dataset.armed=1;el.textContent='Wirklich löschen?';return;}
     sheetDel&&sheetDel();
   },
+  // Nur noch aus der Bearbeiten-Maske erreichbar, nicht mehr von der Karte.
   cover:()=>$('#coverIn').click(),
+  coverOff:()=>{ if(!pendingCover) return; pendingCover.data=null; pendingCover.weg=true; renderCoverBox(); },
 
   open:d=>{S=VEH[d.id];view='vehicle';tab='card';logFilter=partFilter='Alle';window._df='Alle';pushScreen();render();window.scrollTo(0,0)},
   settings:()=>{S=null;view='settings';updateNote=backupNote='';pushScreen();render();window.scrollTo(0,0)},
@@ -1632,12 +1698,15 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('change',async e=>{
   const t=e.target;
-  if(t.id==='coverIn'&&t.files[0]&&S){
+  // Das Titelbild wird nur noch aus der Bearbeiten-Maske gewählt und erst
+  // beim Speichern abgelegt - deshalb hier bloß merken, nicht schreiben.
+  // Der Zuschnitt aus Schritt 7 bleibt außen vor: Ein Autofoto ist kein
+  // Dokument, Entzerren und Dokument-Modus wären hier verkehrt.
+  if(t.id==='coverIn'&&t.files[0]&&pendingCover){
     try{
       const r=await fileToData(t.files[0],1200);
-      if(!await store.set(coverKey(S.id),r.data)) throw new Error('Das Bild konnte nicht gespeichert werden. Der Speicher ist evtl. voll.');
-      IMG[coverKey(S.id)]=r.data; S.cover=true; await save(); render();
-    }catch(err){alert(err.message)}
+      pendingCover.data=r.data; pendingCover.weg=false; renderCoverBox(); showErr('');
+    }catch(err){showErr(err.message||'Das Bild konnte nicht gelesen werden.')}
     t.value='';
   }
   if(t.id==='backupIn'&&t.files[0]){

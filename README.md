@@ -23,9 +23,9 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
 
 - **Garage** – Übersicht aller Fahrzeuge als Karten, mit Warnbanner für
   abgelaufenen oder bald fälligen TÜV.
-- **Fahrzeugkarte** – Titelbild, Kilometerstand, Baujahr, TÜV-Datum, FIN, HSN
-  und TSN sowie eine Kostenübersicht. Die übrigen Felder (Leistung, Hubraum,
-  Kraftstoff) bleiben in der Bearbeiten-Maske erfassbar.
+- **Fahrzeugkarte** – Titelbild, Kilometerstand, Baujahr, TÜV-Datum, letzter
+  Service, FIN, HSN und TSN sowie eine Kostenübersicht. Die übrigen Felder
+  (Leistung, Hubraum, Kraftstoff) bleiben in der Bearbeiten-Maske erfassbar.
 - **Logbuch** – Reparaturen, Wartungen und Umbauten mit Datum, Kilometerstand,
   Kategorie und Kosten. Belege lassen sich direkt am Eintrag anhängen.
 - **Dokumente** – Fahrzeugpapiere, TÜV-Berichte, Versicherung und Rechnungen als
@@ -85,6 +85,32 @@ samt allem, was du schon hineingeschrieben hast.
 
 Gerechnet wird alles in der App selbst — eine Homographie aus den vier Punkten,
 bilinear abgetastet. Keine Zusatzbibliothek, also auch ohne Netz.
+
+## Letzter Service und Titelbild
+
+**Der letzte Service** steht auf der Karte unter dem TÜV-Datum, mit Datum und
+Kilometerstand. Er kommt aus zwei Quellen:
+
+- dem jüngsten Logbuch-Eintrag der Art **Wartung** – der Normalfall, denn den
+  Service trägst du ohnehin ins Logbuch ein;
+- einem Feld **Letzter Service** in der Bearbeiten-Maske, für einen Service aus
+  der Zeit vor der App.
+
+**Angezeigt wird das jüngere von beidem.** Das Feld setzt also den Anfangswert
+und tritt von selbst zurück, sobald das Logbuch weiter ist – sonst stünde nach
+dem nächsten eingetragenen Service weiter der alte Wert auf der Karte, und man
+fände den Grund nicht. Eine **Reparatur** ist kein Service und zählt hier nicht
+mit, auch wenn sie neuer ist.
+
+**Das Titelbild** wird hinter dem Stift oben rechts geändert, zusammen mit allen
+anderen Fahrzeugdaten – es gibt dafür keinen eigenen Knopf mehr auf dem Bild.
+Wie bei den Belegen am Logbuch-Eintrag gilt: Gespeichert wird erst beim
+Speichern. Brichst du ab, bleibt das alte Bild stehen und im Speicher liegt
+nichts Neues. *Entfernen* wirkt ebenso erst beim Speichern.
+
+Durch den Zuschnitt aus dem Abschnitt oben geht das Titelbild bewusst **nicht**:
+Ein Autofoto ist kein Dokument, Geraderücken und Dokument-Modus wären hier
+verkehrt.
 
 ## Dokumente ansehen und vergrößern
 
@@ -239,6 +265,7 @@ die App:
 | `scan` | Entzerrung, Dokument-Modus, Drehen und die Abkürzung bei unberührten Ecken — gegen bekannte Vorlagen nachgerechnet |
 | `kamera` | Kamerastufe mit vorgespieltem Gerät, Auslöser, Ende des Stroms, Rückfallebenen |
 | `vollbild` | Zoom und Schieben mit selbst erzeugten Zeiger-Ereignissen, Grenzen, Einpassen |
+| `karte` | letzter Service aus Logbuch und Handfeld, Titelbild in der Maske, Höhe des Bildbereichs |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter

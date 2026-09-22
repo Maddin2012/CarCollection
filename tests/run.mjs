@@ -8,8 +8,9 @@ import * as navigation from './navigation.test.mjs';
 import * as einstellungen from './einstellungen.test.mjs';
 import * as logdokumente from './logdokumente.test.mjs';
 import * as scan from './scan.test.mjs';
+import * as kamera from './kamera.test.mjs';
 
-const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan];
+const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera];
 
 const { base, close } = await serve();
 const browser = await launch();

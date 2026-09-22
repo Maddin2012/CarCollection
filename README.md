@@ -29,8 +29,9 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
 - **Logbuch** – Reparaturen, Wartungen und Umbauten mit Datum, Kilometerstand,
   Kategorie und Kosten. Belege lassen sich direkt am Eintrag anhängen.
 - **Dokumente** – Fahrzeugpapiere, TÜV-Berichte, Versicherung und Rechnungen als
-  Foto oder PDF, nach Kategorie gruppiert. Fotos lassen sich vor dem Speichern
-  zuschneiden, geraderücken, drehen und aufhellen.
+  Foto oder PDF, nach Kategorie gruppiert. Aufgenommen wird mit der Kamera in
+  der App; vor dem Speichern lässt sich zuschneiden, geraderücken, drehen und
+  aufhellen.
 - **Teile** – gekaufte Teile mit Kategorie, Status (verbaut / auf Lager /
   bestellt), Preis, Händler und Teilenummer.
 - **TÜV-Erinnerung** – Export eines `.ics`-Termins mit Erinnerungen 30 und
@@ -49,7 +50,19 @@ oft grau statt weiß. Deshalb schiebt sich zwischen Aufnahme und Speichern ein
 Zuschnitt — bei jedem Bild, gleich ob es von der Kamera oder aus der Galerie
 kommt. Für PDFs gibt es nichts geradezurücken, die gehen unverändert durch.
 
-**Erste Stufe – Zuschneiden.** Vier Griffe liegen auf den Bildkanten; du ziehst
+**Erste Stufe – Aufnehmen.** *Scannen* zeigt das Sucherbild **in der App**: Blatt
+ins Bild rücken, auslösen, fertig. Es wird keine fremde Kamera-App geöffnet —
+und damit gibt es auch keinen Wechsel, bei dem die Aufnahme verlorengehen kann.
+Beim ersten Mal fragt der Browser einmalig nach der Kamera-Erlaubnis.
+
+Fehlt die Erlaubnis, gibt es keine Kamera oder ist sie gerade von einer anderen
+App belegt, sagt die App den Grund und bietet den Weg über die Kamera-App des
+Geräts als Rückfallebene an. Der Auslöser ist erst dann freigegeben, wenn
+wirklich ein Bild läuft — ein Tipp darauf geht nie ins Leere.
+
+Über *Datei wählen* kommt ein schon vorhandenes Bild oder eine PDF herein.
+
+**Zweite Stufe – Zuschneiden.** Vier Griffe liegen auf den Bildkanten; du ziehst
 sie auf die Ecken des Blattes. Die App rechnet daraus die perspektivische
 Verzerrung heraus und schneidet den Rest weg. Daneben:
 
@@ -57,7 +70,7 @@ Verzerrung heraus und schneidet den Rest weg. Daneben:
   Zuschnitt dreht sich mit.
 - **Ganzes Bild** setzt die Griffe zurück auf die Kanten.
 
-**Zweite Stufe – Ergebnis.** Hier siehst du, was herauskommt, bevor es
+**Dritte Stufe – Ergebnis.** Hier siehst du, was herauskommt, bevor es
 gespeichert wird. Der **Dokument-Modus** macht Graustufen daraus und spreizt den
 Kontrast, damit weißes Papier weiß und die Schrift schwarz wird. Abschaltbar —
 ein Foto eines Bauteils soll ein Foto bleiben.

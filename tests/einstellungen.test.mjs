@@ -5,8 +5,9 @@
    Seite zu sehen bekommt, und die Prüfung liefe ins Leere. Dass er die Datei
    durchlässt statt sie zu cachen, wird weiter unten eigens geprüft - dort mit
    eingeschaltetem Service Worker. */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { REPO, watchErrors } from './lib.mjs';
 
 export const name = 'Einstellungen';
@@ -90,8 +91,30 @@ export default async function ({ browser, base, ok }) {
     await page.waitForSelector('[data-a="backupOut"]:not([disabled])');
     const [dl] = await Promise.all([
       page.waitForEvent('download'), page.click('[data-a="backupOut"]')]);
-    ok(/^carcollection-sicherung-\d{4}-\d{2}-\d{2}\.json$/.test(dl.suggestedFilename()),
+    ok(/^carcollection-sicherung-\d{4}-\d{2}-\d{2}\.txt$/.test(dl.suggestedFilename()),
       `Sicherung aus den Einstellungen: ${dl.suggestedFilename()}`);
+
+    // --- Der Weg wird benannt, statt ihn erraten zu lassen ---
+    // Ohne diese Zeile war nicht zu erkennen, warum kein Teilen-Blatt aufging.
+    await page.waitForSelector('#bakNote');
+    ok((await page.textContent('#bakNote')).includes('Heruntergeladen'),
+      `Die App sagt, was sie getan hat: "${await page.textContent('#bakNote')}"`);
+
+    // --- Der Inhalt ist weiterhin JSON, nur die Endung ist eine andere ---
+    const roh = readFileSync(await dl.path(), 'utf8');
+    const geparst = JSON.parse(roh);
+    ok(geparst.app === 'carcollection' && Array.isArray(geparst.vehicles),
+      'Die .txt enthält unverändert die Sicherung als JSON');
+
+    // --- Und eine alte .json-Sicherung liest sie weiterhin ein ---
+    const altPfad = join(tmpdir(), 'alte-sicherung.json');
+    writeFileSync(altPfad, roh);
+    await page.setInputFiles('#backupIn', altPfad);
+    await page.waitForSelector('[data-a="restoreMerge"]', { timeout: 5000 }).catch(() => {});
+    ok((await page.locator('[data-a="restoreMerge"]').count()) === 1,
+      'Eine Sicherung mit der alten Endung .json wird weiterhin angenommen');
+    await page.click('.panel .row [data-a="close"]');
+    await page.waitForFunction(() => !document.getElementById('sheet').classList.contains('open'));
 
     ok(errors.length === 0, `Keine JS-Fehler${errors.length ? ': ' + errors.join(' | ') : ''}`);
     await ctx.close();

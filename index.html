@@ -149,6 +149,29 @@ input.upper{text-transform:uppercase}
 .note{margin:14px 2px 0;color:var(--muted);font-size:12px;text-align:center}
 .note.warn{color:var(--warn)}
 
+/* Zuschneiden und Entzerren eines Scans */
+#edit{position:fixed;inset:0;z-index:40;background:#070A10;display:flex;flex-direction:column}
+#edit[hidden]{display:none}
+.ebar{flex:none;display:flex;align-items:center;gap:10px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:rgba(16,21,31,.9);border-bottom:1px solid var(--line)}
+.ebar .et{flex:1;min-width:0;text-align:center}
+.ebar .et b{display:block;font-family:var(--font);font-size:17px}
+.ebar .et span{display:block;color:var(--muted);font-size:12px}
+.estage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:14px;touch-action:none}
+/* Der Rahmen sitzt exakt auf dem angezeigten Bild - die Griffe rechnen in
+   Prozent davon, dann stimmen sie bei jeder Anzeigegröße. */
+.ewrap{position:relative;line-height:0;touch-action:none}
+.ewrap canvas{display:block;max-width:100%;max-height:100%;border-radius:4px}
+.ewrap svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.ewrap svg polygon{fill:rgba(110,198,224,.14);stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke}
+/* 44 px Grifffläche - kleiner trifft man auf einem Handy nicht zuverlässig. */
+.ecorner{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:transparent;border:0;padding:0;touch-action:none}
+.ecorner::after{content:"";position:absolute;inset:13px;border-radius:50%;background:var(--accent);border:2px solid #0B1018}
+.ecorner:active::after{inset:9px}
+.etools{flex:none;display:flex;gap:10px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:rgba(23,30,43,.96)}
+.etools .btn{flex:1}
+.etools .btn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.ebusy{color:var(--muted);font-size:13px;text-align:center;padding:20px}
+
 /* Dokumente am Logbuch-Eintrag */
 .dlist{margin-top:6px}
 .dlist .d{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:8px 10px;margin-top:6px}
@@ -178,8 +201,9 @@ input.upper{text-transform:uppercase}
 <nav id="nav"></nav>
 <div id="sheet"></div>
 <div id="full" hidden></div>
+<div id="edit" hidden></div>
 <input type="file" id="coverIn" accept="image/*" hidden>
-<input type="file" id="backupIn" accept="application/json,.json" hidden>
+<input type="file" id="backupIn" accept=".txt,.json,text/plain,application/json" hidden>
 
 <script>
 const PARTCATS=['Motor','Getriebe','Fahrwerk','Bremsen','Reifen','Felgen','Elektrik','Karosserie','Innenraum','Ersatzteile','Sonstiges'];
@@ -190,10 +214,10 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='7';
+const APP_VERSION='9';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
-let updateReady='', updateNote='';
+let updateReady='', updateNote='', backupNote='';
 const IMG={}; let persistent=true; const mem={};
 
 /* ---------- Speicher ----------
@@ -305,16 +329,27 @@ async function saveFile(name,blob){
   let file=null;
   try{ file=new File([blob],name,{type:blob.type}) }catch(e){}
   if(file&&navigator.canShare&&navigator.share&&navigator.canShare({files:[file]})){
-    try{ await navigator.share({files:[file]}); return true }
+    try{ await navigator.share({files:[file]}); return 'geteilt' }
     // Abgebrochen heißt abgebrochen - dann nicht hinterher doch herunterladen.
-    catch(e){ if(e&&e.name==='AbortError') return true }
+    catch(e){ if(e&&e.name==='AbortError') return 'abgebrochen' }
   }
   const a=document.createElement('a');
   const url=URL.createObjectURL(blob);
   a.href=url; a.download=name; a.rel='noopener';
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),3e4);
-  return true;
+  return 'geladen';
+}
+
+/* Ob der Browser das Teilen-Blatt für eine Datei dieser Art anbietet. Chrome
+   hat dafür eine feste Erlaubnisliste, auf der weder .json noch .ics stehen -
+   geprüft wird deshalb mit einer Probe genau des Typs, der später herausgeht,
+   nicht mit irgendeiner Datei. */
+function kannTeilen(name,typ){
+  try{
+    return !!(navigator.canShare&&navigator.share
+      &&navigator.canShare({files:[new File([''],name,{type:typ})]}));
+  }catch(e){ return false }
 }
 
 // data:-URL zurück in einen Blob; iOS öffnet data:-Verweise nicht.
@@ -324,6 +359,157 @@ function dataToBlob(dataUrl){
   const bin=atob(b64), arr=new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
   return new Blob([arr],{type:mime});
+}
+
+/* ---------- Zuschneiden und Entzerren ----------
+   Ein abfotografiertes Blatt ist schief und hat den Schreibtisch mit drauf.
+   Die vier Ecken sagt der Nutzer an, die Rechnung macht die App selbst - keine
+   Zusatzbibliothek, damit es auch ohne Netz geht. */
+
+/* Die Datei als Canvas laden, ohne sie unterwegs neu zu kodieren. fileToData
+   macht daraus sofort ein JPEG; entzerrt man das anschließend und speichert es
+   wieder als JPEG, komprimiert man zweimal. Hier wird einmal kodiert, am Ende. */
+function fileToCanvas(file,max){
+  return new Promise((res,rej)=>{
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const s=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement('canvas');
+      c.width=Math.max(1,Math.round(img.width*s)); c.height=Math.max(1,Math.round(img.height*s));
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      res(c);
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error('Das Bild konnte nicht geladen werden.')); };
+    img.src=url;
+  });
+}
+
+/* Lineares Gleichungssystem lösen, Gauß mit Spaltenpivotisierung.
+   m ist eine n x (n+1)-Matrix; zurück kommen die n Unbekannten. */
+function loese(m){
+  const n=m.length;
+  for(let i=0;i<n;i++){
+    let p=i;
+    for(let r=i+1;r<n;r++) if(Math.abs(m[r][i])>Math.abs(m[p][i])) p=r;
+    if(Math.abs(m[p][i])<1e-12) return null;      // entartet, z. B. Ecken aufeinander
+    [m[i],m[p]]=[m[p],m[i]];
+    for(let r=0;r<n;r++){
+      if(r===i) continue;
+      const f=m[r][i]/m[i][i];
+      for(let c=i;c<=n;c++) m[r][c]-=f*m[i][c];
+    }
+  }
+  // Nach der Elimination steht in Zeile i nur noch die Diagonale: x_i = b_i/a_ii
+  return m.map((zeile,i)=>zeile[n]/zeile[i]);
+}
+
+/* Homographie, die das Zielrechteck (0,0)-(w,h) auf das Viereck im Quellbild
+   abbildet. Rückwärts gerechnet: Zu jedem Zielpixel wird der Quellpunkt
+   gesucht, dann bleibt im Ergebnis kein Loch.
+   ecken: [[x,y] x4] in der Reihenfolge oben-links, oben-rechts,
+   unten-rechts, unten-links. */
+function homographie(ecken,w,h){
+  const ziel=[[0,0],[w,0],[w,h],[0,h]];
+  const m=[];
+  for(let i=0;i<4;i++){
+    const [u,v]=ziel[i], [x,y]=ecken[i];
+    m.push([u,v,1,0,0,0,-u*x,-v*x, x]);
+    m.push([0,0,0,u,v,1,-u*y,-v*y, y]);
+  }
+  return loese(m);   // [a,b,c,d,e,f,g,h]
+}
+
+const abstand=(p,q)=>Math.hypot(p[0]-q[0],p[1]-q[1]);
+
+/* Maße des Ergebnisses aus dem Viereck: die jeweils längere gegenüberliegende
+   Kante, damit nichts gestaucht wird. Gedeckelt wie sonst auch auf max px. */
+function zielMasse(ecken,max){
+  let w=Math.max(abstand(ecken[0],ecken[1]),abstand(ecken[3],ecken[2]));
+  let h=Math.max(abstand(ecken[0],ecken[3]),abstand(ecken[1],ecken[2]));
+  const s=Math.min(1,max/Math.max(w,h));
+  return {w:Math.max(1,Math.round(w*s)),h:Math.max(1,Math.round(h*s))};
+}
+
+/* Das Viereck aus dem Quellcanvas geradegerückt in ein neues Canvas.
+   Bilinear abgetastet - mit dem nächsten Nachbarn wird Schrift fransig. */
+function entzerren(src,ecken,max=1600){
+  const {w,h}=zielMasse(ecken,max);
+  const k=homographie(ecken,w,h);
+  const out=document.createElement('canvas'); out.width=w; out.height=h;
+  if(!k){ out.getContext('2d').drawImage(src,0,0,w,h); return out; }
+  const [a,b,c,d,e,f,g,hh]=k;
+  const sctx=src.getContext('2d');
+  const s=sctx.getImageData(0,0,src.width,src.height), sd=s.data, sw=src.width, sh=src.height;
+  const octx=out.getContext('2d');
+  const o=octx.createImageData(w,h), od=o.data;
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const nen=g*x+hh*y+1;
+      const u=(a*x+b*y+c)/nen, v=(d*x+e*y+f)/nen;
+      const i=(y*w+x)*4;
+      if(u<0||v<0||u>sw-1||v>sh-1){ od[i]=od[i+1]=od[i+2]=255; od[i+3]=255; continue; }
+      const x0=u|0, y0=v|0;
+      const x1=x0+1<sw?x0+1:x0, y1=y0+1<sh?y0+1:y0;
+      const fx=u-x0, fy=v-y0;
+      const p00=(y0*sw+x0)*4, p10=(y0*sw+x1)*4, p01=(y1*sw+x0)*4, p11=(y1*sw+x1)*4;
+      for(let ch=0;ch<3;ch++){
+        const oben=sd[p00+ch]+(sd[p10+ch]-sd[p00+ch])*fx;
+        const unten=sd[p01+ch]+(sd[p11+ch]-sd[p01+ch])*fx;
+        od[i+ch]=oben+(unten-oben)*fy;
+      }
+      od[i+3]=255;
+    }
+  }
+  octx.putImageData(o,0,0);
+  return out;
+}
+
+/* Dokument-Modus: Graustufen, dann den Kontrast spreizen. Schwarz- und
+   Weißpunkt kommen aus dem Histogramm (2. und 98. Perzentil), damit ein paar
+   dunkle oder sehr helle Ausreißer nicht die ganze Spreizung auffressen. */
+function dokumentModus(src){
+  const w=src.width, h=src.height;
+  const ctx=src.getContext('2d');
+  const bild=ctx.getImageData(0,0,w,h), d=bild.data;
+  const hist=new Uint32Array(256);
+  const grau=new Uint8ClampedArray(w*h);
+  for(let i=0,p=0;i<d.length;i+=4,p++){
+    const g=(d[i]*.299+d[i+1]*.587+d[i+2]*.114)|0;
+    grau[p]=g; hist[g]++;
+  }
+  const gesamt=w*h;
+  const perzentil=q=>{
+    let summe=0, ziel=gesamt*q;
+    for(let i=0;i<256;i++){ summe+=hist[i]; if(summe>=ziel) return i; }
+    return 255;
+  };
+  let lo=perzentil(.02), hi=perzentil(.98);
+  if(hi-lo<8){ lo=0; hi=255; }     // fast einfarbig - lieber nichts spreizen
+  const skala=255/(hi-lo);
+  const out=document.createElement('canvas'); out.width=w; out.height=h;
+  const octx=out.getContext('2d');
+  const o=octx.createImageData(w,h), od=o.data;
+  for(let p=0,i=0;p<grau.length;p++,i+=4){
+    let g=(grau[p]-lo)*skala;
+    g=g<0?0:(g>255?255:g);
+    od[i]=od[i+1]=od[i+2]=g; od[i+3]=255;
+  }
+  octx.putImageData(o,0,0);
+  return out;
+}
+
+/* Um 90 Grad im Uhrzeigersinn drehen. Die Ecken wandern mit, damit ein schon
+   gesetzter Zuschnitt beim Drehen nicht verloren geht. */
+function drehen90(src,ecken){
+  const w=src.width, h=src.height;
+  const out=document.createElement('canvas'); out.width=h; out.height=w;
+  const ctx=out.getContext('2d');
+  ctx.translate(h,0); ctx.rotate(Math.PI/2); ctx.drawImage(src,0,0);
+  // (x,y) -> (H-y, x); die Reihenfolge der Ecken rückt um eins weiter, damit
+  // "oben links" auch nach dem Drehen oben links liegt.
+  const neu=ecken.map(([x,y])=>[h-y,x]);
+  return {canvas:out,ecken:[neu[3],neu[0],neu[1],neu[2]]};
 }
 
 function fileToData(file,max){
@@ -353,6 +539,7 @@ const ICONS={
   part:'<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
   edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
   close:'<path d="M6 6l12 12M18 6L6 18"/>',
+  rot:'<path d="M4 9h11a4.5 4.5 0 0 1 0 9H8"/><path d="M7.5 5.5L4 9l3.5 3.5"/>',
   // Zahnrad mit Zähnen statt Strahlen - sonst kaum vom Teile-Symbol zu unterscheiden
   gear:'<circle cx="12" cy="12" r="3.4"/><path d="M12 2.6l1.5 2.2 2.6-.6.4 2.6 2.5 1-1.2 2.4 1.7 2-2.2 1.5.4 2.6-2.6.2-1.1 2.4-2-1.6-2 1.6-1.1-2.4-2.6-.2.4-2.6L2.5 12l1.7-2L3 7.6l2.5-1 .4-2.6 2.6.6z"/>'
 };
@@ -417,9 +604,9 @@ function renderSettings(){
   $('#title').textContent='Einstellungen'; $('#sub').textContent='';
   $('#topBtn').innerHTML=`<button class="btn ghost ico" data-a="closeSettings" aria-label="Einstellungen schließen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button>`;
   // Ob das Teilen-Blatt zur Verfügung steht, entscheidet der Browser - nicht
-  // die Betriebssystem-Kennung. Deshalb hier eine Probe mit einer Testdatei.
-  let teilen=false;
-  try{ teilen=!!(navigator.canShare&&navigator.share&&navigator.canShare({files:[new File([''],'probe.json',{type:'application/json'})]})) }catch(e){}
+  // die Betriebssystem-Kennung. Geprüft wird mit genau der Art Datei, die
+  // später auch wirklich herausgeht.
+  const teilen=kannTeilen(backupName(),BACKUP_TYP);
   $('#view').innerHTML=`
     <section class="sect">
       <h2>Sicherung</h2>
@@ -429,8 +616,9 @@ function renderSettings(){
       </div>
       <p class="note">Die Sicherung enthält alle Fahrzeuge samt Fotos und Dokumenten. Sie ist dein einziges Backup und der Weg, die Akte auf ein anderes Gerät zu holen.</p>
       <p class="note" id="shareNote">${teilen
-        ?'Beim Speichern öffnet sich das Teilen-Blatt. Dort <b>Drive</b> wählen und den Ordner <b>Car Collection / Sicherung</b> ansteuern – dann liegt die Sicherung nicht nur auf diesem Gerät.'
+        ?'Beim Speichern öffnet sich das Teilen-Blatt. Dort <b>Drive</b> wählen und den Ordner <b>Car Collection / Sicherung</b> ansteuern – dann liegt die Sicherung nicht nur auf diesem Gerät. Die Datei endet auf <b>.txt</b>, weil Chrome nur solche Dateien teilt; ihr Inhalt ist unverändert.'
         :'Die Sicherung wird heruntergeladen. Leg sie danach selbst in Drive ab, damit sie nicht nur auf diesem Gerät liegt.'}</p>
+      ${backupNote?`<p class="note" id="bakNote">${esc(backupNote)}</p>`:''}
     </section>
     <section class="sect">
       <h2>Updates</h2>
@@ -591,30 +779,39 @@ let sheetSave=null, sheetDel=null, pending=null, pendingDoc=null;
    Bildschirm, die Reiter sind Ansichten darin. */
 const screenState=()=>view==='settings'?{s:'settings'}
   :(view==='vehicle'&&S?{s:'vehicle',id:S.id,tab}:{s:'garage'});
-let modalEntry=false;   // liegt gerade ein Modal-Eintrag obenauf?
+/* Modale können übereinanderliegen: Der Zuschnitt eines Scans öffnet sich über
+   dem Sheet, aus dem er angestoßen wurde. Deshalb ein Stapel statt eines
+   Schalters - sonst schlösse ein einziges Zurück beides auf einmal, samt der
+   schon getippten Formularwerte. */
+let modalStack=[];      // z. B. ['sheet'] oder ['sheet','edit']
 
 const pushScreen=()=>{history.pushState(screenState(),'');};
 const syncScreen=()=>{history.replaceState(screenState(),'');};
-function pushModal(){ if(!modalEntry){ history.pushState({s:'modal'},''); modalEntry=true; } }
+function pushModal(art){
+  // Dasselbe Modal nicht zweimal in den Stapel legen.
+  if(modalStack[modalStack.length-1]===art) return;
+  modalStack.push(art);
+  history.pushState({s:'modal',k:art},'');
+}
 
 /* Ein Modal zu schließen heißt zurückzugehen. Täte man es direkt, bliebe sein
    Eintrag im Stapel stehen und die Geste liefe einmal ins Leere. */
 function dismissModal(){
-  if(modalEntry) history.back();      // schließen und zeichnen erledigt popstate
-  else { closeFull(); closeSheet(); render(); }
+  if(modalStack.length) history.back();   // schließen und zeichnen erledigt popstate
+  else { closeEdit(); closeFull(); closeSheet(); render(); }
 }
 /* Für die Fälle, in denen das Schließen zugleich den Bildschirm wechselt:
    Der Modal-Eintrag wird durch den neuen Bildschirm ersetzt, statt ihn
    zurückzunehmen - sonst landete man auf dem alten Bildschirm. */
 function replaceModalWith(){
-  closeFull(); closeSheet();
-  modalEntry=false;
+  closeEdit(); closeFull(); closeSheet();
+  modalStack=[];
   syncScreen();
   render();
 }
 
 function openSheet(title,body,onSave,del){
-  pushModal();
+  pushModal('sheet');
   sheetSave=onSave; sheetDel=del||null; pending=null;
   $('#sheet').innerHTML=`<div class="scrim" data-a="close"></div><div class="panel" role="dialog" aria-label="${esc(title)}"><div class="grab"></div><h2>${esc(title)}</h2><div id="sbody">${body}</div><div class="err" id="err"></div>
   <div class="row">${del?'<button class="btn ghost danger" data-a="del">Löschen</button>':''}<button class="btn ghost" data-a="close">${onSave?'Abbrechen':'Schließen'}</button>${onSave?'<button class="btn primary" data-a="ok">Speichern</button>':''}</div></div>`;
@@ -646,6 +843,22 @@ const docBezug=doc=>{
   return l?' · zu: '+esc(l.title):'';
 };
 
+/* Ein fertiges Dokument in die offene Maske übernehmen - je nachdem, welche
+   gerade offen ist. Der Zuschnitt ruft das am Ende auf, PDFs gehen direkt her. */
+function docAufnehmen(r,dateiname){
+  if(logDocs){
+    // Logbuch-Maske: mehrere Anhänge, gespeichert wird erst beim Speichern.
+    logDocs.add.push({tmp:uid(),data:r.data,type:r.type,datei:dateiname});
+    renderLogDocs(); showErr('');
+  }else{
+    pending=r;
+    const fn=$('#fname'); if(fn) fn.textContent='Ausgewählt: '+dateiname;
+    showErr('');
+    const ti=document.querySelector('#sbody [name=title]');
+    if(ti&&!ti.value) ti.value=dateiname.replace(/\.[^.]+$/,'');
+  }
+}
+
 function renderLogDocs(){
   const box=$('#logDocs'); if(!box||!logDocs) return;
   const zeile=(kuerzel,name,sub,id)=>`<div class="d"><div class="ic">${kuerzel}</div>
@@ -661,7 +874,7 @@ function renderLogDocs(){
 /* ---------- Vollbildanzeige für Dokumente ---------- */
 let fullDoc=null;
 function openFull(doc,data){
-  pushModal();
+  pushModal('full');
   fullDoc=doc;
   const f=$('#full');
   f.innerHTML=`<div class="fbar">
@@ -677,6 +890,113 @@ function closeFull(){
   const f=$('#full'); f.hidden=true; f.innerHTML=''; fullDoc=null;
   document.body.classList.remove('noscroll');
 }
+
+/* ---------- Der Zuschnitt-Layer ----------
+   Liegt über dem Sheet, aus dem er angestoßen wurde, und hat einen eigenen
+   History-Eintrag: Ein Zurück schließt nur ihn, das Sheet bleibt samt
+   Eingaben stehen. Zwei Stufen - erst die Ecken, dann das Ergebnis. */
+// unberuehrt heißt: Die Ecken liegen noch auf den Kanten des Arbeitsbildes.
+// Dann gibt es nichts geradezurücken und das Bild geht unverändert durch.
+let E=null;   // {arbeit, ecken, unberuehrt, stufe, ergebnis, ergebnisDok, dokModus, fertig}
+
+function closeEdit(){
+  const l=$('#edit'); l.hidden=true; l.innerHTML=''; E=null;
+  if($('#full').hidden) document.body.classList.remove('noscroll');
+}
+
+const eckenVoll=c=>[[0,0],[c.width,0],[c.width,c.height],[0,c.height]];
+
+function openEdit(canvas,fertig){
+  pushModal('edit');
+  E={arbeit:canvas,ecken:eckenVoll(canvas),unberuehrt:true,stufe:'crop',
+     ergebnis:null,ergebnisDok:null,dokModus:false,fertig};
+  document.body.classList.add('noscroll');
+  $('#edit').hidden=false;
+  renderEdit();
+}
+
+function renderEdit(){
+  if(!E) return;
+  const l=$('#edit');
+  if(E.stufe==='crop'){
+    l.innerHTML=`<div class="ebar">
+        <button class="btn ghost ico" data-a="editAb" aria-label="Abbrechen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button>
+        <div class="et"><b>Zuschneiden</b><span>Ecken auf die Blattkanten ziehen</span></div>
+        <button class="btn ghost ico" data-a="editDrehen" aria-label="Drehen"><svg viewBox="0 0 24 24">${ICONS.rot}</svg></button>
+      </div>
+      <div class="estage"><div class="ewrap" id="ewrap"></div></div>
+      <div class="etools">
+        <button class="btn ghost" data-a="editReset">Ganzes Bild</button>
+        <button class="btn primary" data-a="editUeber">Übernehmen</button>
+      </div>`;
+    const wrap=$('#ewrap');
+    wrap.appendChild(E.arbeit);
+    wrap.insertAdjacentHTML('beforeend',
+      `<svg viewBox="0 0 ${E.arbeit.width} ${E.arbeit.height}" preserveAspectRatio="none"><polygon id="equad"/></svg>`+
+      [0,1,2,3].map(i=>`<button class="ecorner" data-ecke="${i}" aria-label="Ecke ${i+1}"></button>`).join(''));
+    zeichneEcken();
+  }else{
+    l.innerHTML=`<div class="ebar">
+        <button class="btn ghost ico" data-a="editZurueck" aria-label="Zurück zum Zuschneiden"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button>
+        <div class="et"><b>Ergebnis</b><span>${E.ergebnis.width} × ${E.ergebnis.height} Punkte</span></div>
+        <span style="width:37px"></span>
+      </div>
+      <div class="estage"><div class="ewrap" id="ewrap"></div></div>
+      <div class="etools">
+        <button class="btn ghost${E.dokModus?' on':''}" data-a="editDok">Dokument-Modus</button>
+        <button class="btn primary" data-a="editSpeichern">Speichern</button>
+      </div>`;
+    $('#ewrap').appendChild(ergebnisBild());
+  }
+}
+
+/* Das anzuzeigende Ergebnis. Der Dokument-Modus geht einmal über alle Pixel;
+   beim Hin- und Herschalten wäre das jedes Mal spürbar, deshalb gemerkt. */
+function ergebnisBild(){
+  if(!E.dokModus) return E.ergebnis;
+  if(!E.ergebnisDok) E.ergebnisDok=dokumentModus(E.ergebnis);
+  return E.ergebnisDok;
+}
+
+/* Die Griffe rechnen in Prozent des angezeigten Bildes, dann sitzen sie bei
+   jeder Anzeigegröße richtig - auch nach dem Drehen. */
+function zeichneEcken(){
+  if(!E||E.stufe!=='crop') return;
+  const w=E.arbeit.width, h=E.arbeit.height;
+  const q=$('#equad');
+  if(q) q.setAttribute('points',E.ecken.map(p=>p.join(',')).join(' '));
+  document.querySelectorAll('#ewrap .ecorner').forEach(el=>{
+    const [x,y]=E.ecken[+el.dataset.ecke];
+    el.style.left=(x/w*100)+'%'; el.style.top=(y/h*100)+'%';
+  });
+}
+
+/* Ziehen über Zeiger-Ereignisse: deckt Finger, Stift und Maus gleichermaßen ab.
+   setPointerCapture hält den Griff auch, wenn der Finger ihn verlässt. */
+document.addEventListener('pointerdown',e=>{
+  const griff=e.target.closest&&e.target.closest('.ecorner');
+  if(!griff||!E||E.stufe!=='crop') return;
+  e.preventDefault();
+  const i=+griff.dataset.ecke, bild=$('#ewrap canvas');
+  griff.setPointerCapture(e.pointerId);
+  const ziehen=ev=>{
+    const r=bild.getBoundingClientRect();
+    if(!r.width||!r.height) return;
+    const x=(ev.clientX-r.left)/r.width*E.arbeit.width;
+    const y=(ev.clientY-r.top)/r.height*E.arbeit.height;
+    E.ecken[i]=[Math.min(Math.max(x,0),E.arbeit.width),Math.min(Math.max(y,0),E.arbeit.height)];
+    E.unberuehrt=false;
+    zeichneEcken();
+  };
+  const ende=()=>{
+    griff.removeEventListener('pointermove',ziehen);
+    griff.removeEventListener('pointerup',ende);
+    griff.removeEventListener('pointercancel',ende);
+  };
+  griff.addEventListener('pointermove',ziehen);
+  griff.addEventListener('pointerup',ende);
+  griff.addEventListener('pointercancel',ende);
+});
 // Ein Dokument samt Bilddatei entfernen - von beiden Ansichten aus derselbe Weg.
 async function removeDoc(doc){
   S.docs=S.docs.filter(x=>x.id!==doc.id);
@@ -688,6 +1008,14 @@ async function removeDoc(doc){
 const BACKUP_TAG='carcollection';
 // Sicherungen aus der Zeit, als die App noch Fahrzeugakte hieß, bleiben lesbar.
 const BACKUP_TAGS=[BACKUP_TAG,'fahrzeugakte'];
+/* Die Sicherung geht als Textdatei heraus, obwohl ihr Inhalt JSON ist: Chrome
+   teilt nur Dateien aus einer festen Erlaubnisliste (.txt, .csv, .pdf, Bilder,
+   Ton, Video) - .json steht nicht darauf. Als .json käme sie nie ins
+   Teilen-Blatt, sondern immer nur in den Download-Ordner. Beim Einlesen
+   entscheidet der Inhalt und nicht die Endung, alte .json-Sicherungen bleiben
+   also lesbar. */
+const BACKUP_TYP='text/plain';
+const backupName=()=>'carcollection-sicherung-'+today()+'.txt';
 let pendingBackup=null;
 
 async function collectBackup(){
@@ -800,7 +1128,7 @@ const A={
   cover:()=>$('#coverIn').click(),
 
   open:d=>{S=VEH[d.id];view='vehicle';tab='card';logFilter=partFilter='Alle';window._df='Alle';pushScreen();render();window.scrollTo(0,0)},
-  settings:()=>{S=null;view='settings';updateNote='';pushScreen();render();window.scrollTo(0,0)},
+  settings:()=>{S=null;view='settings';updateNote=backupNote='';pushScreen();render();window.scrollTo(0,0)},
   // Die Einstellungen sind ein Bildschirm wie jeder andere: Schließen heißt zurück.
   closeSettings:()=>history.back(),
   checkUpdate:(d,el)=>{ el.disabled=true; el.textContent='Wird geprüft …'; checkUpdate(true) },
@@ -821,12 +1149,22 @@ const A={
       new Blob([ics],{type:'text/calendar;charset=utf-8'}));
   },
 
-  backupOut:async()=>{
+  backupOut:async(d,el)=>{
     if(!IDX.length) return;
+    if(el){ el.disabled=true; el.textContent='Wird erstellt …'; }
     try{
-      const blob=new Blob([JSON.stringify(await collectBackup())],{type:'application/json'});
-      await saveFile('carcollection-sicherung-'+today()+'.json',blob);
-    }catch(err){ alert('Die Sicherung konnte nicht erstellt werden: '+err.message) }
+      const blob=new Blob([JSON.stringify(await collectBackup())],{type:BACKUP_TYP});
+      const weg=await saveFile(backupName(),blob);
+      // Der Rückfall auf den Download war bisher stumm - genau daran ließ sich
+      // nicht erkennen, warum kein Teilen-Blatt kam.
+      backupNote=weg==='geteilt'?'Die Sicherung ist im Teilen-Blatt. Wähle dort Drive.'
+        :weg==='abgebrochen'?'Abgebrochen – es wurde nichts gespeichert.'
+        :'Heruntergeladen. Das Teilen-Blatt bietet dein Browser für diese Datei nicht an.';
+    }catch(err){
+      backupNote='';
+      alert('Die Sicherung konnte nicht erstellt werden: '+err.message);
+    }
+    if(view==='settings') render();
   },
   backupIn:()=>$('#backupIn').click(),
   restoreMerge:()=>{ if(pendingBackup) applyBackup(pendingBackup,false) },
@@ -947,6 +1285,41 @@ const A={
     openSheet(doc.title,`<div class="viewer"><div class="meta">${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}${docBezug(doc)}</div>${view}</div>`,null,
       async()=>{await removeDoc(doc);dismissModal();});
   },
+  // --- Zuschnitt ---
+  editAb:()=>dismissModal(),                 // Zurück, also nur diese Schicht zu
+  editReset:()=>{ if(!E) return; E.ecken=eckenVoll(E.arbeit); E.unberuehrt=true; zeichneEcken(); },
+  editDrehen:()=>{
+    if(!E) return;
+    const r=drehen90(E.arbeit,E.ecken);
+    // unberuehrt bleibt, wie es war: Die Drehung steckt bereits im Arbeitsbild.
+    // Sie zu einem Grund für die Entzerrung zu machen, hieße das Bild ohne Not
+    // neu abzutasten und damit weicher.
+    E.arbeit=r.canvas; E.ecken=r.ecken;
+    renderEdit();
+  },
+  editUeber:async(d,el)=>{
+    if(!E) return;
+    el.disabled=true; el.textContent='Wird gerechnet …';
+    // Einen Zug warten, damit der Knopf die Beschriftung auch zeigt, bevor
+    // die Rechnung den Faden für ein paar hundert Millisekunden belegt.
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    // Unberührte Ecken ohne Drehung: kein Grund, das Bild neu abzutasten -
+    // das machte es nur weicher.
+    E.ergebnis=E.unberuehrt?E.arbeit:entzerren(E.arbeit,E.ecken);
+    E.ergebnisDok=null;
+    E.stufe='ergebnis';
+    renderEdit();
+  },
+  editZurueck:()=>{ if(!E) return; E.stufe='crop'; renderEdit(); },
+  editDok:()=>{ if(!E) return; E.dokModus=!E.dokModus; renderEdit(); },
+  editSpeichern:()=>{
+    if(!E) return;
+    const c=ergebnisBild();
+    const fertig=E.fertig;
+    fertig({data:c.toDataURL('image/jpeg',.74),type:'image'});
+    dismissModal();      // schließt nur den Zuschnitt, das Sheet bleibt
+  },
+
   closeFull:()=>dismissModal(),
   delFull:async(d,el)=>{
     if(!el.dataset.armed){el.dataset.armed=1;el.textContent='Wirklich löschen?';return;}
@@ -968,16 +1341,24 @@ document.addEventListener('click',e=>{
    statt die App zu verlassen. */
 addEventListener('popstate',e=>{
   const st=e.state||{s:'garage'};
-  modalEntry=false;
-  closeFull(); closeSheet();
+  // Wir landen auf einem Modal, das noch darunterliegt: Dann ist nur die
+  // oberste Schicht gemeint. Das Sheet bleibt stehen, mitsamt allem, was
+  // schon hineingetippt wurde - deshalb hier auch kein render().
+  if(st.s==='modal'){
+    modalStack.pop();
+    closeEdit();
+    return;
+  }
+  modalStack=[];
+  closeEdit(); closeFull(); closeSheet();
   if(st.s==='vehicle'&&VEH[st.id]){ S=VEH[st.id]; view='vehicle'; tab=st.tab||'card'; }
   else if(st.s==='settings'){ S=null; view='settings'; }
-  else if(st.s!=='modal'){ S=null; view='garage'; }
+  else { S=null; view='garage'; }
   render(); window.scrollTo(0,0);
 });
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape') return;
-  if(!$('#full').hidden||$('#sheet').classList.contains('open')) dismissModal();
+  if(!$('#edit').hidden||!$('#full').hidden||$('#sheet').classList.contains('open')) dismissModal();
 });
 document.addEventListener('change',async e=>{
   const t=e.target;
@@ -1002,15 +1383,11 @@ document.addEventListener('change',async e=>{
     // Zurücksetzen, sonst meldet sich dieselbe Datei beim zweiten Mal nicht.
     t.value='';
     try{
-      const r=await fileToData(datei,1600);
-      if(logDocs){
-        // Logbuch-Maske: mehrere Anhänge, gespeichert wird erst beim Speichern.
-        logDocs.add.push({tmp:uid(),data:r.data,type:r.type,datei:datei.name});
-        renderLogDocs(); showErr('');
-      }else{
-        pending=r; $('#fname').textContent='Ausgewählt: '+datei.name; showErr('');
-        const ti=document.querySelector('#sbody [name=title]');
-        if(ti&&!ti.value) ti.value=datei.name.replace(/\.[^.]+$/,'');
+      if(datei.type==='application/pdf'){ docAufnehmen(await fileToData(datei,1600),datei.name); }
+      else{
+        // Bilder gehen durch den Zuschnitt - ein abfotografiertes Blatt ist
+        // schief, gleich ob es von der Kamera oder aus der Galerie kommt.
+        openEdit(await fileToCanvas(datei,2000),r=>docAufnehmen(r,datei.name));
       }
     }catch(err){showErr(err.message)}
   }

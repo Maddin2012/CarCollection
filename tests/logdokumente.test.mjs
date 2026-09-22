@@ -7,7 +7,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { REPO, watchErrors } from './lib.mjs';
+import { REPO, watchErrors, bildDurchwinken } from './lib.mjs';
 
 export const name = 'Logbuch-Dokumente';
 
@@ -49,9 +49,11 @@ export default async function ({ browser, base, ok }) {
   await page.fill('[name="date"]', '2026-03-14');
   await page.fill('[name="cost"]', '780.50');
   await page.setInputFiles('#fPick', BILD);
+  await bildDurchwinken(page);
   await page.waitForSelector('#logDocs .d');
   ok((await page.locator('#logDocs .d').count()) === 1, 'Erstes Dokument erscheint in der Liste');
   await page.setInputFiles('#fPick', BILD2);
+  await bildDurchwinken(page);
   await page.waitForFunction(() => document.querySelectorAll('#logDocs .d').length === 2);
   ok((await page.locator('#logDocs .d').count()) === 2, 'Mehrere Dokumente sind möglich');
 
@@ -104,6 +106,7 @@ export default async function ({ browser, base, ok }) {
 
   // --- Abbrechen hängt nichts an ---
   await page.setInputFiles('#fPick', BILD);
+  await bildDurchwinken(page);
   await page.waitForFunction(() => document.querySelectorAll('#logDocs .d').length === 3);
   await page.click('.panel .row [data-a="close"]');
   await zu();
@@ -174,6 +177,7 @@ export default async function ({ browser, base, ok }) {
     await page2.click('[data-a="addLog"]');
     await page2.fill('[name="title"]', 'Bremsen erneuert');
     await page2.setInputFiles('#fPick', BILD);
+    await bildDurchwinken(page2);
     await page2.waitForSelector('#logDocs .d');
     await page2.click('[data-a="ok"]');
     await page2.waitForFunction(

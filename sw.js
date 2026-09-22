@@ -4,7 +4,7 @@
    WICHTIG: bei jeder Änderung an index.html o. ä. die Fassung hochzählen - hier
    CACHE, dazu APP_VERSION in index.html und version.json. Alle drei müssen
    dieselbe Zahl tragen, die CI vergleicht sie. */
-const CACHE = 'carcollection-v7';
+const CACHE = 'carcollection-v9';
 const ASSETS = [
   './',
   './index.html',

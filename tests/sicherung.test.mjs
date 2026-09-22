@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { REPO, watchErrors } from './lib.mjs';
+import { REPO, watchErrors, bildDurchwinken } from './lib.mjs';
 
 export const name = 'Sicherung';
 
@@ -38,6 +38,7 @@ export default async function ({ browser, base, ok }) {
   await page.click('[data-a="tab"][data-k="doc"]');
   await page.click('[data-a="addDoc"]');
   await page.setInputFiles('#fPick', join(REPO, 'icons/icon-512.png'));
+  await bildDurchwinken(page);
   await page.waitForSelector('#fname:not(:empty)');
   await page.fill('[name="title"]', 'TÜV-Bericht 2026');
   await page.click('[data-a="ok"]');
@@ -79,7 +80,7 @@ export default async function ({ browser, base, ok }) {
   await page.waitForSelector('[data-a="backupOut"]');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-a="backupOut"]')]);
   const file = await dl.path();
-  ok(/^carcollection-sicherung-\d{4}-\d{2}-\d{2}\.json$/.test(dl.suggestedFilename()),
+  ok(/^carcollection-sicherung-\d{4}-\d{2}-\d{2}\.txt$/.test(dl.suggestedFilename()),
     `Dateiname: ${dl.suggestedFilename()}`);
 
   const backup = JSON.parse(readFileSync(file, 'utf8'));

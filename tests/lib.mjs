@@ -4,6 +4,7 @@ import http from 'node:http';
 import { createReadStream, statSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { deflateSync } from 'node:zlib';
 
 export const REPO = fileURLToPath(new URL('..', import.meta.url));
 
@@ -54,6 +55,57 @@ export function reporter(name) {
     console.log(`  ${cond ? 'PASS' : 'FAIL'}  ${label}`);
   };
   return r;
+}
+
+/* Ein PNG bekannter Maße bauen. Die Icons im Repository sind alle quadratisch -
+   damit ließe sich eine Drehung nicht von einem Nichtstun unterscheiden.
+   malen(x,y) liefert [r,g,b] für jeden Punkt. */
+export function png(w, h, malen) {
+  const roh = Buffer.alloc(h * (w * 3 + 1));
+  for (let y = 0, p = 0; y < h; y++) {
+    roh[p++] = 0;                                  // Filtertyp "keiner"
+    for (let x = 0; x < w; x++) {
+      const [r, g, b] = malen(x, y);
+      roh[p++] = r; roh[p++] = g; roh[p++] = b;
+    }
+  }
+  const crcTab = [];
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    crcTab[n] = c >>> 0;
+  }
+  const crc = buf => {
+    let c = 0xFFFFFFFF;
+    for (const b of buf) c = crcTab[(c ^ b) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  };
+  const chunk = (typ, daten) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(daten.length);
+    const koerper = Buffer.concat([Buffer.from(typ, 'ascii'), daten]);
+    const pruef = Buffer.alloc(4); pruef.writeUInt32BE(crc(koerper));
+    return Buffer.concat([len, koerper, pruef]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8; ihdr[9] = 2;                        // 8 Bit, Echtfarben ohne Alpha
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(roh)),
+    chunk('IEND', Buffer.alloc(0))
+  ]);
+}
+
+/* Seit Schritt 7 schiebt sich der Zuschnitt zwischen Auswahl und Ablegen.
+   Wer ihn nicht prüfen will, winkt ihn hiermit unverändert durch - genau wie
+   ein Nutzer, der nichts ändern möchte: zweimal tippen. */
+export async function bildDurchwinken(page) {
+  await page.waitForSelector('#edit:not([hidden]) [data-a="editUeber"]');
+  await page.click('[data-a="editUeber"]');
+  await page.waitForSelector('[data-a="editSpeichern"]');
+  await page.click('[data-a="editSpeichern"]');
+  await page.waitForSelector('#edit[hidden]', { state: 'attached' });
 }
 
 /* Sammelt Seitenfehler und Konsolenfehler einer Seite ein. */

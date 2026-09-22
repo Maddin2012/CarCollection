@@ -38,11 +38,19 @@ const IOS_STANDALONE = () => {
 
 // Android-Chrome bietet das Teilen-Blatt für Dateien an, kennt aber kein
 // navigator.standalone und kann ebenso gut herunterladen.
+//
+// Entscheidend: Chrome teilt nur Dateien aus einer festen Erlaubnisliste
+// (chrome/browser/webshare/share_service_impl.cc). Weder .json noch .ics stehen
+// darauf. Der Stub bildet das nach - vorher lieferte er für jede Datei true und
+// hat deshalb übersehen, dass die Sicherung als .json nie ins Teilen-Blatt kam.
 const ANDROID_SHARE = () => {
   window.__shared = [];
+  const ERLAUBT = ['.txt', '.text', '.csv', '.pdf', '.png', '.jpg', '.jpeg',
+                   '.webp', '.gif', '.svg', '.mp3', '.mp4'];
   Object.defineProperty(Navigator.prototype, 'canShare', {
     configurable: true, writable: true,
-    value: d => !!(d && d.files && d.files.length)
+    value: d => !!(d && d.files && d.files.length
+      && d.files.every(f => ERLAUBT.some(e => f.name.toLowerCase().endsWith(e))))
   });
   Object.defineProperty(Navigator.prototype, 'share', {
     configurable: true, writable: true,
@@ -134,9 +142,9 @@ export default async function ({ browser, base, ok }) {
     await page.click('[data-a="backupOut"]');
     await page.waitForFunction(() => window.__shared.length > 2);
     shared = await page.evaluate(() => window.__shared);
-    ok(/^carcollection-sicherung-\d{4}-\d{2}-\d{2}\.json$/.test(shared[2][0].name),
+    ok(/^carcollection-sicherung-\d{4}-\d{2}-\d{2}\.txt$/.test(shared[2][0].name),
       `Sicherung wird geteilt: ${shared[2][0].name}`);
-    ok(shared[2][0].type === 'application/json', 'Sicherung hat den richtigen Typ');
+    ok(shared[2][0].type === 'text/plain', `Sicherung hat den richtigen Typ: ${shared[2][0].type}`);
 
     ok(errors.length === 0, `Keine JS-Fehler${errors.length ? ': ' + errors.join(' | ') : ''}`);
     await ctx.close();
@@ -166,7 +174,7 @@ export default async function ({ browser, base, ok }) {
     await page.click('[data-a="settings"]');
     await page.waitForSelector('[data-a="backupOut"]');
     const [bak] = await Promise.all([page.waitForEvent('download'), page.click('[data-a="backupOut"]')]);
-    ok(/\.json$/.test(bak.suggestedFilename()), `Sicherung wird heruntergeladen: ${bak.suggestedFilename()}`);
+    ok(/\.txt$/.test(bak.suggestedFilename()), `Sicherung wird heruntergeladen: ${bak.suggestedFilename()}`);
 
     ok(errors.length === 0, `Keine JS-Fehler${errors.length ? ': ' + errors.join(' | ') : ''}`);
     await ctx.close();
@@ -205,7 +213,7 @@ export default async function ({ browser, base, ok }) {
     await page.click('[data-a="backupOut"]');
     await page.waitForFunction(() => window.__shared.length > 0);
     const shared = await page.evaluate(() => window.__shared);
-    ok(/^carcollection-sicherung-\d{4}-\d{2}-\d{2}\.json$/.test(shared[0][0].name),
+    ok(/^carcollection-sicherung-\d{4}-\d{2}-\d{2}\.txt$/.test(shared[0][0].name),
       `Sicherung geht ins Teilen-Blatt: ${shared[0][0].name}`);
     await page.waitForTimeout(400);
     ok(!heruntergeladen, 'Und nicht zusätzlich in den Download-Ordner');
@@ -223,8 +231,40 @@ export default async function ({ browser, base, ok }) {
     await page.evaluate(() => { navigator.share = async () => { throw new Error('kaputt'); }; });
     const [dl] = await Promise.all([
       page.waitForEvent('download'), page.click('[data-a="backupOut"]')]);
-    ok(/\.json$/.test(dl.suggestedFilename()),
+    ok(/\.txt$/.test(dl.suggestedFilename()),
       `Scheitert das Teilen, wird heruntergeladen: ${dl.suggestedFilename()}`);
+
+    // --- Die Endung entscheidet, nicht der gute Wille ---
+    // Chrome teilt nur Dateien von seiner Erlaubnisliste. Genau daran ist die
+    // Sicherung als .json gescheitert: Sie landete immer im Download-Ordner,
+    // ohne dass die App ein Wort darüber verloren hätte.
+    await page.evaluate(() => {
+      window.__shared = [];
+      navigator.share = async d => {
+        window.__shared.push(d.files.map(f => ({ name: f.name, type: f.type })));
+      };
+    });
+    const wegFuer = (name, typ) => page.evaluate(
+      ([name, typ]) => saveFile(name, new Blob(['{}'], { type: typ })), [name, typ]);
+    ok(await wegFuer('probe.json', 'application/json') === 'geladen',
+      'Eine .json erreicht das Teilen-Blatt nicht, sie wird heruntergeladen');
+    ok(await wegFuer('probe.ics', 'text/calendar') === 'geladen',
+      'Ein Kalendereintrag ebenso wenig - .ics steht nicht auf der Liste');
+    ok(await wegFuer('probe.txt', 'text/plain') === 'geteilt',
+      'Eine .txt dagegen geht ins Teilen-Blatt');
+    ok(await wegFuer('probe.pdf', 'application/pdf') === 'geteilt',
+      'Ein PDF ebenfalls');
+    ok((await page.evaluate(() => window.__shared.length)) === 2,
+      'Geteilt wurden genau die beiden erlaubten Dateien');
+
+    // --- Und die Einstellungen sagen den Weg an, der wirklich genommen wird ---
+    await page.evaluate(() => { delete Navigator.prototype.share; delete Navigator.prototype.canShare; });
+    await page.click('[data-a="closeSettings"]');
+    await page.waitForSelector('.mini');
+    await page.click('[data-a="settings"]');
+    await page.waitForSelector('[data-a="backupOut"]');
+    ok((await page.textContent('#shareNote')).includes('heruntergeladen'),
+      'Ohne Teilen-Blatt kündigt die App den Download an');
 
     ok(errors.length === 0, `Keine JS-Fehler${errors.length ? ': ' + errors.join(' | ') : ''}`);
     await ctx.close();

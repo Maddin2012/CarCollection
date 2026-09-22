@@ -4,7 +4,7 @@
    Die Geste selbst lässt sich hier nicht auslösen - Playwright kennt keinen
    Randwisch. Geprüft wird der Mechanismus darunter, den die Geste bedient:
    goBack() löst dasselbe popstate aus. */
-import { watchErrors } from './lib.mjs';
+import { watchErrors, bildDurchwinken } from './lib.mjs';
 
 export const name = 'Navigation';
 
@@ -74,6 +74,7 @@ export default async function ({ browser, base, ok }) {
   await page.click('[data-a="tab"][data-k="doc"]');
   await page.click('[data-a="addDoc"]');
   await page.setInputFiles('#fPick', new URL('../icons/icon-192.png', import.meta.url).pathname);
+  await bildDurchwinken(page);
   await page.waitForSelector('#fname:not(:empty)');
   await page.fill('[name="title"]', 'Rechnung');
   await page.click('[data-a="ok"]');

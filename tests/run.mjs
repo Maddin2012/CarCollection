@@ -9,8 +9,9 @@ import * as einstellungen from './einstellungen.test.mjs';
 import * as logdokumente from './logdokumente.test.mjs';
 import * as scan from './scan.test.mjs';
 import * as kamera from './kamera.test.mjs';
+import * as vollbild from './vollbild.test.mjs';
 
-const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera];
+const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera, vollbild];
 
 const { base, close } = await serve();
 const browser = await launch();

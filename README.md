@@ -31,7 +31,8 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
 - **Dokumente** – Fahrzeugpapiere, TÜV-Berichte, Versicherung und Rechnungen als
   Foto oder PDF, nach Kategorie gruppiert. Aufgenommen wird mit der Kamera in
   der App; vor dem Speichern lässt sich zuschneiden, geraderücken, drehen und
-  aufhellen.
+  aufhellen. Gespeicherte Bilder öffnen formatfüllend und lassen sich mit zwei
+  Fingern vergrößern.
 - **Teile** – gekaufte Teile mit Kategorie, Status (verbaut / auf Lager /
   bestellt), Preis, Händler und Teilenummer.
 - **TÜV-Erinnerung** – Export eines `.ics`-Termins mit Erinnerungen 30 und
@@ -84,6 +85,30 @@ samt allem, was du schon hineingeschrieben hast.
 
 Gerechnet wird alles in der App selbst — eine Homographie aus den vier Punkten,
 bilinear abgetastet. Keine Zusatzbibliothek, also auch ohne Netz.
+
+## Dokumente ansehen und vergrößern
+
+Ein Tipp auf ein Bild-Dokument öffnet es formatfüllend auf dunklem Grund. Weil
+in dieser App Fahrzeugscheine und TÜV-Berichte liegen, ist das Vergrößern hier
+kein Beiwerk — im Ganzen ist so ein Blatt schlicht nicht zu lesen:
+
+- **Zwei Finger auf- und zuziehen** vergrößert bis zum Sechsfachen. Die Stelle
+  zwischen den Fingern bleibt dabei stehen, das Bild wandert also nicht unter
+  der Geste weg.
+- **Ein Finger schiebt** das vergrößerte Bild. Über den Rand hinaus geht es
+  nicht: Sichtbar bleibt immer Bild, nie der leere Grund daneben.
+- **Zuziehen** führt zurück auf die Ausgangsgröße und wieder in die Mitte.
+- Auf dem Rechner zoomt das **Mausrad** an der Zeigerspitze.
+
+Ein Tipp **neben** das Bild schließt die Anzeige, ein Tipp **auf** das Bild tut
+nichts — sonst ginge beim Schieben zu leicht etwas versehentlich zu. Dazu bleibt
+der Knopf oben links, die Esc-Taste und die Zurück-Geste.
+
+Vor Fassung 11 stand hier nur `touch-action: pinch-zoom`: Das erlaubt den
+Seitenzoom des Browsers, und den gibt es in der installierten App
+(`display: standalone`) gar nicht. Ein gespeichertes Dokument ließ sich dort
+also nicht vergrößern. Der Zoom ist jetzt eigener Code der App und hängt nicht
+mehr daran, wie die App gestartet wurde.
 
 ## Belege am Logbuch-Eintrag
 
@@ -201,13 +226,19 @@ npm test
 ```
 
 Die Tests starten einen eigenen Webserver und fahren ein echtes Chromium gegen
-die App — drei Reihen:
+die App:
 
 | Reihe | Prüft |
 | --- | --- |
 | `grundfunktionen` | Speicherung in IndexedDB, Überleben von Neuladen und neuem Tab, Manifest, Icons, Service Worker, Offline-Betrieb |
 | `sicherung` | Export, vollständiges Leeren des Speichers, Wiedereinlesen samt Bildern, Zusammenführen ohne Duplikate, Abweisen fremder Dateien |
-| `plattformen` | beide Plattform-Pfade, indem Safaris Eigenheiten im Chromium nachgestellt werden |
+| `plattformen` | beide Plattform-Pfade, indem Safaris Eigenheiten im Chromium nachgestellt werden; dazu Chromes Erlaubnisliste fürs Teilen |
+| `navigation` | Zurück-Geste über Garage, Fahrzeug, Sheets und Vollbild; kein toter History-Eintrag nach dem Schließen |
+| `einstellungen` | Zahnrad, Sicherung von dort, laufende Fassung und Update-Prüfung |
+| `logdokumente` | Belege am Logbuch-Eintrag: Anlegen, Bezug, Löschen des Eintrags |
+| `scan` | Entzerrung, Dokument-Modus, Drehen und die Abkürzung bei unberührten Ecken — gegen bekannte Vorlagen nachgerechnet |
+| `kamera` | Kamerastufe mit vorgespieltem Gerät, Auslöser, Ende des Stroms, Rückfallebenen |
+| `vollbild` | Zoom und Schieben mit selbst erzeugten Zeiger-Ereignissen, Grenzen, Einpassen |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter

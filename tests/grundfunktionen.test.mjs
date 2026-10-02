@@ -12,7 +12,10 @@ export default async function ({ browser, base, ok }) {
 
   // --- Speicher-Backend ---
   ok(await page.evaluate(() => !!window.indexedDB), 'IndexedDB im Browser vorhanden');
-  ok(await page.evaluate(() => persistent === true), 'App meldet dauerhaften Speicher');
+  // Nicht mehr "persistent === true": Das bedeutete nur "nicht der
+  // Arbeitsspeicher" und stand auch bei localStorage da. Geprüft wird jetzt,
+  // welcher Speicher es wirklich ist.
+  ok(await page.evaluate(() => speicherArt === 'idb'), 'Die Akte liegt in IndexedDB');
   ok(await page.locator('.note.warn').count() === 0, 'Kein "Speichern nicht verfügbar"-Hinweis');
 
   // --- Fahrzeug anlegen ---

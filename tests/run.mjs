@@ -11,8 +11,9 @@ import * as scan from './scan.test.mjs';
 import * as kamera from './kamera.test.mjs';
 import * as vollbild from './vollbild.test.mjs';
 import * as karte from './karte.test.mjs';
+import * as speicher from './speicher.test.mjs';
 
-const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera, vollbild, karte];
+const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera, vollbild, karte, speicher];
 
 const { base, close } = await serve();
 const browser = await launch();

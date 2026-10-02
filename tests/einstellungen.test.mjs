@@ -130,7 +130,10 @@ export default async function ({ browser, base, ok }) {
     watchErrors(page, errors);
     await page.goto(base, { waitUntil: 'networkidle' });
 
-    ok((await page.locator('.alert').count()) === 0,
+    // Gezielt auf die Update-Meldung, nicht auf "irgendeine Meldung": Seit
+    // Fassung 13 kann in der Garage auch ein Speicher- oder Sicherungshinweis
+    // stehen, und der hat mit der Update-Prüfung nichts zu tun.
+    ok((await page.locator('#updAlert').count()) === 0,
       'Bei gleicher Fassung meldet sich die stille Prüfung nicht');
     await page.click('[data-a="settings"]');
     await page.waitForSelector('[data-a="checkUpdate"]');
@@ -155,10 +158,10 @@ export default async function ({ browser, base, ok }) {
     await page.goto(base, { waitUntil: 'networkidle' });
 
     // Die stille Prüfung beim Start meldet sich hier sehr wohl.
-    await page.waitForSelector('.alert', { timeout: 10000 });
-    ok((await page.textContent('.alert')).includes('999'),
+    await page.waitForSelector('#updAlert', { timeout: 10000 });
+    ok((await page.textContent('#updAlert')).includes('999'),
       'Die stille Prüfung beim Start weist auf die neue Fassung hin');
-    await page.click('.alert [data-a="settings"], .alert button');
+    await page.click('#updAlert [data-a="settings"]');
     await page.waitForSelector('.sect');
     ok((await page.textContent('#title')) === 'Einstellungen',
       'Der Hinweis führt in die Einstellungen');

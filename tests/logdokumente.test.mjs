@@ -98,8 +98,16 @@ export default async function ({ browser, base, ok }) {
   ok(d2.length === 2 && d2.every(d => d.logId === l1[0].id), 'Der Bezug übersteht ein Neuladen');
 
   // --- Beim Bearbeiten stehen die Anhänge wieder da ---
+  // Seit Fassung 14 öffnet ein Eintrag zum Lesen. Die Maske kommt über den
+  // Stift in der Ecke des Leseblattes.
+  const eintragBearbeiten = async () => {
+    await page.click('.item[data-a="openLog"]');
+    await page.waitForSelector('.shead [data-a="editLog"]');
+    await page.click('.shead [data-a="editLog"]');
+    await page.waitForSelector('#logDocs');
+  };
   await reiter('log');
-  await page.click('[data-a="editLog"]');
+  await eintragBearbeiten();
   await page.waitForSelector('#logDocs .d');
   ok((await page.locator('#logDocs .d').count()) === 2,
     'Beim Bearbeiten stehen die angehängten Dokumente in der Maske');
@@ -113,7 +121,7 @@ export default async function ({ browser, base, ok }) {
   ok((await docs()).length === 2, 'Abbrechen legt das neu Gewählte nicht ab');
 
   // --- Das × löst nur den Bezug, es löscht nicht ---
-  await page.click('[data-a="editLog"]');
+  await eintragBearbeiten();
   await page.waitForSelector('#logDocs .d');
   await page.click('#logDocs .d [data-a="logDocOff"]');
   await page.waitForFunction(() => document.querySelectorAll('#logDocs .d').length === 1);
@@ -130,7 +138,7 @@ export default async function ({ browser, base, ok }) {
   // --- Den Eintrag löschen: die Dokumente bleiben ---
   // Eine Rechnung ist auch ohne den Eintrag noch etwas wert.
   await reiter('log');
-  await page.click('[data-a="editLog"]');
+  await eintragBearbeiten();
   await page.click('.panel [data-a="del"]');
   await page.click('.panel [data-a="del"]');
   await zu();

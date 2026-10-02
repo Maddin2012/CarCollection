@@ -31,7 +31,9 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
   Service, FIN, HSN und TSN sowie eine Kostenübersicht. Die übrigen Felder
   (Leistung, Hubraum, Kraftstoff) bleiben in der Bearbeiten-Maske erfassbar.
 - **Logbuch** – Reparaturen, Wartungen und Umbauten mit Datum, Kilometerstand,
-  Kategorie und Kosten. Belege lassen sich direkt am Eintrag anhängen.
+  Kategorie und Kosten. Ein Eintrag öffnet zum Lesen, bearbeitet wird über den
+  Stift in der Ecke. Belege und Ersatzteile lassen sich direkt am Eintrag
+  anhängen; die Teile erscheinen dann auch im Reiter Teile.
 - **Dokumente** – Fahrzeugpapiere, TÜV-Berichte, Versicherung und Rechnungen als
   Foto oder PDF, nach Kategorie gruppiert. Aufgenommen wird mit der Kamera in
   der App; vor dem Speichern lässt sich zuschneiden, geraderücken, drehen und
@@ -139,6 +141,49 @@ Seitenzoom des Browsers, und den gibt es in der installierten App
 (`display: standalone`) gar nicht. Ein gespeichertes Dokument ließ sich dort
 also nicht vergrößern. Der Zoom ist jetzt eigener Code der App und hängt nicht
 mehr daran, wie die App gestartet wurde.
+
+## Logbuch-Eintrag lesen und bearbeiten
+
+Ein Tipp auf einen Eintrag öffnet ihn **zum Lesen**: Art, Kategorie, Datum,
+Kilometerstand und Kosten, darunter die Notiz, die angehängten Dokumente und die
+verknüpften Teile. Keine Eingabefelder, nichts, was man versehentlich ändert.
+
+Bearbeitet wird über den **Stift in der Ecke des Blattes** – dasselbe Symbol an
+derselben Stelle wie bei der Fahrzeugkarte. Die Dokumente im Leseblatt sind
+antippbar und öffnen formatfüllend; die Zurück-Geste führt von dort wieder ins
+Leseblatt, nicht gleich hinaus. Teile stehen nur als Text da, geändert werden
+sie im Reiter Teile.
+
+## Teile am Logbuch-Eintrag
+
+Damit ein Ersatzteil nicht zweimal erfasst werden muss, hat die Maske eines
+Logbuch-Eintrags einen Bereich **Teile** mit zwei Wegen:
+
+- **Neues Teil anlegen** – Bezeichnung, Kategorie, Preis und Teilenummer, dann
+  *Teil hinzufügen*. Der Status wird *Verbaut*, das Datum übernimmt das des
+  Eintrags; Händler und Notiz lassen sich später im Reiter Teile nachtragen.
+- **Vorhandenes Teil verknüpfen** – aus der Auswahl, die alle Teile zeigt, die
+  noch an keinem Eintrag hängen.
+
+Wie bei den Belegen liegt ein Teil dabei **nur an einer Stelle**, nämlich in der
+Teileliste des Fahrzeugs; der Bezug zum Eintrag ist ein Feld daran. Es wird also
+nichts doppelt gespeichert und es gibt nichts abzugleichen. Dasselbe Teil
+erscheint am Eintrag und im Reiter Teile, dort mit dem Vermerk
+*zu: &lt;Titel des Eintrags&gt;*.
+
+Das **×** löst ein Teil nur vom Eintrag. Löschst du einen Eintrag, bleiben seine
+Teile erhalten und verlieren nur den Bezug.
+
+### Wie die Kosten gezählt werden
+
+**Ein verknüpftes Teil zählt in den Ausgaben auf der Fahrzeugkarte nicht noch
+einmal mit.** Es gelten die Kosten des Logbuch-Eintrags – trage den Teilepreis
+also dort mit ein, sonst fehlt er in der Summe. Verliert ein Teil den Bezug
+(etwa weil der Eintrag gelöscht wurde), zählt es wieder voll mit.
+
+Die Summe im Reiter **Teile** ist davon unberührt: Sie ist die Summe der dort
+angezeigten Teile. Stehen verknüpfte darunter, sagt ein Satz unter der Summe,
+warum die beiden Zahlen nicht dasselbe zählen.
 
 ## Belege am Logbuch-Eintrag
 
@@ -317,6 +362,7 @@ die App:
 | `vollbild` | Zoom und Schieben mit selbst erzeugten Zeiger-Ereignissen, Grenzen, Einpassen |
 | `karte` | letzter Service aus Logbuch und Handfeld, Titelbild in der Maske, Höhe des Bildbereichs |
 | `speicher` | gestellte Lesefehler verlieren keine Daten, Datenrettung in beiden Speichern, ehrliche Speicheranzeige, Sicherungsmahnung |
+| `logteile` | Leseblatt ohne Eingabefelder, Teile anlegen und verknüpfen, die Kostenregel mit zwei Zahlen nachgerechnet |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter

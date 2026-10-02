@@ -136,6 +136,11 @@ body.noscroll{overflow:hidden}
 @media (prefers-reduced-motion:reduce){.panel{animation:none}}
 .grab{width:40px;height:4px;border-radius:9px;background:var(--line);margin:0 auto 12px}
 .panel h2{margin:0 0 12px;font-family:var(--font);font-size:22px}
+/* Überschrift und ein Knopf in der Ecke des Blattes - der Stift im Leseblatt
+   eines Logbuch-Eintrags. Ohne Knopf verhält sich die Zeile wie vorher. */
+.shead{display:flex;align-items:flex-start;gap:10px}
+.shead h2{flex:1;min-width:0;overflow-wrap:anywhere}
+.shead .btn.ico{flex:none;margin-top:-2px}
 label{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 4px}
 input,select,textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:11px;padding:11px 12px;font:inherit;font-size:16px}
 textarea{min-height:64px;resize:vertical}
@@ -149,6 +154,8 @@ input.upper{text-transform:uppercase}
 .filebox .btn{flex:1}
 .fname{font-size:13px;color:var(--ok);margin-top:8px}
 .rmeta{color:var(--muted);font-size:12.5px;margin:10px 0 0}
+/* Eine Notiz behält ihre Zeilenumbrüche, wenn sie nur gelesen wird. */
+.rmeta.nl{white-space:pre-wrap;color:var(--text);font-size:14px}
 .panel .stats{margin:14px 0 0}
 .note{margin:14px 2px 0;color:var(--muted);font-size:12px;text-align:center}
 .note.warn{color:var(--warn)}
@@ -226,7 +233,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='13';
+const APP_VERSION='14';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='', backupNote='';
@@ -606,8 +613,16 @@ const ICONS={
   edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
   close:'<path d="M6 6l12 12M18 6L6 18"/>',
   rot:'<path d="M4 9h11a4.5 4.5 0 0 1 0 9H8"/><path d="M7.5 5.5L4 9l3.5 3.5"/>',
-  // Zahnrad mit Zähnen statt Strahlen - sonst kaum vom Teile-Symbol zu unterscheiden
-  gear:'<circle cx="12" cy="12" r="3.4"/><path d="M12 2.6l1.5 2.2 2.6-.6.4 2.6 2.5 1-1.2 2.4 1.7 2-2.2 1.5.4 2.6-2.6.2-1.1 2.4-2-1.6-2 1.6-1.1-2.4-2.6-.2.4-2.6L2.5 12l1.7-2L3 7.6l2.5-1 .4-2.6 2.6.6z"/>'
+  /* Ein geschlossener Zahnkranz mit sechs rechteckigen Zähnen plus Nabe,
+     ausgerechnet statt von Hand gezeichnet (Zahnkopf 3,9 px, Lücke 1,8 px bei
+     21 px Darstellung). Der vorige Pfad war ein krakeliger Umriss, und ein
+     Kranz aus Strahlen wäre vom Teile-Symbol kaum zu unterscheiden gewesen -
+     das ist ein dünner Kreis mit Strahlen. Jetzt unterscheiden sich die beiden
+     im Aufbau und nicht nur in Details. */
+  gear:'<path d="M9.5 5.9L10.0 2.8L14.0 2.8L14.5 5.9L16.1 6.8L19.0 5.7L20.9 9.1'
+      +'L18.5 11.1L18.5 12.9L20.9 14.9L19.0 18.3L16.1 17.2L14.5 18.1L14.0 21.2'
+      +'L10.0 21.2L9.5 18.1L7.9 17.2L5.0 18.3L3.1 14.9L5.5 12.9L5.5 11.1L3.1 9.1'
+      +'L5.0 5.7L7.9 6.8Z"/><circle cx="12" cy="12" r="2.9"/>'
 };
 const TABS=[['card','Karte'],['log','Logbuch'],['doc','Dokumente'],['part','Teile']];
 
@@ -877,7 +892,11 @@ function letzterService(akte){
 function viewCard(){
   const v=S.v, has=v.name;
   const ti=tuevInfo();
-  const total=S.logs.reduce((a,l)=>a+Number(l.cost||0),0)+S.parts.reduce((a,p)=>a+Number(p.price||0),0);
+  /* Verknüpfte Teile zählen nicht noch einmal mit: Ihr Preis steckt in den
+     Kosten des Logbuch-Eintrags, an dem sie hängen. Verliert ein Teil den
+     Bezug - etwa weil der Eintrag gelöscht wurde -, zählt es wieder. */
+  const total=S.logs.reduce((a,l)=>a+Number(l.cost||0),0)
+    +S.parts.filter(p=>!p.logId).reduce((a,p)=>a+Number(p.price||0),0);
   const dash='–';
   // Leistung, Hubraum und Kraftstoff bleiben in der Bearbeiten-Maske erfassbar,
   // stehen aber nicht mehr auf der Karte.
@@ -917,11 +936,11 @@ function viewLog(){
   const sum=list.reduce((a,l)=>a+Number(l.cost||0),0);
   return `<div class="chips">${chips}</div>`+
   (list.length?`<div class="sum"><span>${list.length} Einträge</span><b>${eur(sum)}</b></div>`+list.map(l=>{
-    const n=docsOf(l.id).length;
+    const n=docsOf(l.id).length, t=partsOf(l.id).length;
     return `
-    <button class="item" data-a="editLog" data-id="${l.id}">
+    <button class="item" data-a="openLog" data-id="${l.id}">
       <div class="ico">${esc(l.type.slice(0,3))}</div>
-      <div class="mid"><div class="t">${esc(l.title)}</div><div class="s">${dt(l.date)} · ${esc(l.category)}${l.km?' · '+km(l.km):''}${n?' · '+n+(n===1?' Dokument':' Dokumente'):''}</div></div>
+      <div class="mid"><div class="t">${esc(l.title)}</div><div class="s">${dt(l.date)} · ${esc(l.category)}${l.km?' · '+km(l.km):''}${n?' · '+n+(n===1?' Dokument':' Dokumente'):''}${t?' · '+t+(t===1?' Teil':' Teile'):''}</div></div>
       <div class="r">${l.cost?eur(l.cost):''}</div>
     </button>`}).join('')
   :`<div class="empty"><b>Noch keine Einträge</b>Halte Reparaturen, Wartungen und Umbauten mit Datum, Kilometerstand und Kosten fest.</div>`);
@@ -949,14 +968,20 @@ function viewPart(){
   const list=S.parts.filter(p=>partFilter==='Alle'||p.category===partFilter);
   const sum=list.reduce((a,p)=>a+Number(p.price||0),0);
   const groups=PARTCATS.filter(c=>list.some(p=>p.category===c));
-  return (S.parts.length?`<div class="chips">${chips}</div><div class="sum"><span>${list.length} Teile</span><b>${eur(sum)}</b></div>`:'')+
+  // Die Summe hier ist die Summe der angezeigten Teile. Die Gesamtsumme der
+  // Karte lässt verknüpfte Teile aus, weil ihr Preis in den Kosten des
+  // Eintrags steckt - das muss dastehen, sonst laufen die Zahlen rätselhaft
+  // auseinander.
+  const verknuepft=list.filter(p=>p.logId).length;
+  return (S.parts.length?`<div class="chips">${chips}</div><div class="sum"><span>${list.length} Teile</span><b>${eur(sum)}</b></div>`
+    +(verknuepft?`<p class="dhint">Darunter ${verknuepft} ${verknuepft===1?'Teil, das':'Teile, die'} zu einem Logbuch-Eintrag ${verknuepft===1?'gehört':'gehören'}. ${verknuepft===1?'Sein':'Ihr'} Preis steckt in den Kosten des Eintrags und zählt in den Ausgaben auf der Karte nicht noch einmal mit.</p>`:''):'')+
   (list.length?groups.map(g=>{
     const items=list.filter(p=>p.category===g);
     return `<div class="grp"><span>${g}</span><span>${eur(items.reduce((a,p)=>a+Number(p.price||0),0))}</span></div>`+
     items.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(p=>`
     <button class="item" data-a="editPart" data-id="${p.id}">
       <div class="ico">${esc(p.status.slice(0,2))}</div>
-      <div class="mid"><div class="t">${esc(p.name)}</div><div class="s">${esc(p.status)}${p.date?' · '+dt(p.date):''}${p.vendor?' · '+esc(p.vendor):''}</div></div>
+      <div class="mid"><div class="t">${esc(p.name)}</div><div class="s">${esc(p.status)}${p.date?' · '+dt(p.date):''}${p.vendor?' · '+esc(p.vendor):''}${partBezug(p)}</div></div>
       <div class="r">${p.price?eur(p.price):''}${p.partno?`<small>${esc(p.partno)}</small>`:''}</div>
     </button>`).join('');
   }).join('')
@@ -1024,15 +1049,33 @@ function replaceModalWith(){
   render();
 }
 
-function openSheet(title,body,onSave,del){
+/* kopf: ein zusätzlicher Knopf neben der Überschrift - für den Stift im
+   Leseblatt eines Logbuch-Eintrags. Die übrigen Aufrufe lassen ihn weg. */
+function openSheet(title,body,onSave,del,kopf){
   pushModal('sheet');
   sheetSave=onSave; sheetDel=del||null; pending=null;
-  $('#sheet').innerHTML=`<div class="scrim" data-a="close"></div><div class="panel" role="dialog" aria-label="${esc(title)}"><div class="grab"></div><h2>${esc(title)}</h2><div id="sbody">${body}</div><div class="err" id="err"></div>
+  $('#sheet').innerHTML=`<div class="scrim" data-a="close"></div><div class="panel" role="dialog" aria-label="${esc(title)}"><div class="grab"></div><div class="shead"><h2>${esc(title)}</h2>${kopf||''}</div><div id="sbody">${body}</div><div class="err" id="err"></div>
   <div class="row">${del?'<button class="btn ghost danger" data-a="del">Löschen</button>':''}<button class="btn ghost" data-a="close">${onSave?'Abbrechen':'Schließen'}</button>${onSave?'<button class="btn primary" data-a="ok">Speichern</button>':''}</div></div>`;
   $('#sheet').classList.add('open');
 }
-const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=pendingDoc=logDocs=pendingCover=null;};
-const vals=()=>{const o={};document.querySelectorAll('#sbody [name]').forEach(e=>o[e.name]=e.value.trim());return o;};
+const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=pendingDoc=logDocs=logParts=pendingCover=null;};
+/* Sammelt die Felder der offenen Maske ein. Felder in einem Nebenformular -
+   etwa dem für ein neues Teil am Logbuch-Eintrag - bleiben ausdrücklich
+   draußen: Sonst klebten sie über Object.assign still am Datensatz und fielen
+   erst Monate später auf. */
+const vals=()=>{
+  const o={};
+  document.querySelectorAll('#sbody [name]').forEach(e=>{
+    if(e.closest('[data-nebenform]')) return;
+    o[e.name]=e.value.trim();
+  });
+  return o;
+};
+const nebenVals=sel=>{
+  const o={};
+  document.querySelectorAll(sel+' [name]').forEach(e=>o[e.name]=e.value.trim());
+  return o;
+};
 /* Ohne offene Maske gäbe es sonst einen Fehler im Fehlerpfad - und die Meldung
    käme nie an. Genau daran ließ sich auf dem Gerät nicht erkennen, was
    schiefging: Es kam einfach nichts. */
@@ -1094,6 +1137,42 @@ function renderCoverBox(){
   box.style.backgroundImage=bild?`url(${bild})`:'';
   box.textContent=bild?'':'Kein Titelbild';
   const raus=$('#coverOff'); if(raus) raus.hidden=!bild;
+}
+
+/* ---------- Teile am Logbuch-Eintrag ----------
+   Genau wie bei den Dokumenten: Ein Teil liegt ausschließlich in S.parts und
+   trägt mit logId den Bezug zum Eintrag. Damit gibt es nichts abzugleichen -
+   der Reiter Teile zeigt dieselben Sätze. Gespeichert wird erst beim Speichern
+   des Eintrags; bricht man ab, bleibt nichts zurück. */
+let logParts=null;   // {logId, add:[{tmp,...felder}], an:[partId], off:[partId]}
+
+const partsOf=id=>S.parts.filter(p=>p.logId===id);
+const partBezug=p=>{
+  const l=p.logId&&S.logs.find(x=>x.id===p.logId);
+  return l?' · zu: '+esc(l.title):'';
+};
+
+function renderLogParts(){
+  const box=$('#logParts'); if(!box||!logParts) return;
+  const zeile=(kuerzel,name,sub,id)=>`<div class="d"><div class="ic">${kuerzel}</div>
+    <div class="n">${esc(name)}<small>${esc(sub)}</small></div>
+    <button data-a="logPartOff" data-id="${id}" aria-label="Vom Eintrag lösen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button></div>`;
+  const alte=partsOf(logParts.logId).concat(logParts.an.map(id=>S.parts.find(p=>p.id===id)).filter(Boolean))
+    .filter(p=>!logParts.off.includes(p.id))
+    .map(p=>zeile(p.status?p.status.slice(0,2):'TL',p.name,p.category+(p.price?' · '+eur(p.price):''),p.id)).join('');
+  const neue=logParts.add
+    .map(n=>zeile('NEU',n.name,n.category+(n.price?' · '+eur(n.price):'')+' · neu',n.tmp)).join('');
+  box.innerHTML=(alte+neue)||'<p class="dhint">Noch kein Teil verknüpft.</p>';
+  // Die Auswahl zeigt nur Teile, die an keinem Eintrag hängen und hier noch
+  // nicht vorgemerkt sind - sonst ließe sich dasselbe Teil zweimal anhängen.
+  const w=$('#logPartPick');
+  if(w){
+    const frei=S.parts.filter(p=>!p.logId&&!logParts.an.includes(p.id));
+    w.innerHTML=frei.length
+      ? `<option value="">– vorhandenes Teil wählen –</option>`+frei.map(p=>`<option value="${p.id}">${esc(p.name)}${p.category?' ('+esc(p.category)+')':''}</option>`).join('')
+      : `<option value="">– kein freies Teil vorhanden –</option>`;
+    w.disabled=!frei.length;
+  }
 }
 
 function renderLogDocs(){
@@ -1703,6 +1782,51 @@ const A={
     if(pendingBackup) applyBackup(pendingBackup,true);
   },
 
+  /* Ein Logbuch-Eintrag öffnet zum Lesen, nicht zum Bearbeiten. Der Stift oben
+     rechts in der Ecke des Blattes führt in die Maske - wie beim Fahrzeug.
+     Dokumente bleiben antippbar: Lesen heißt auch, den Beleg ansehen zu
+     können. Das Vollbild ist eine eigene Modal-Art, die Zurück-Geste führt
+     also von dort wieder hierher. Teile stehen als Text da; geändert werden
+     sie im Reiter Teile. */
+  openLog:d=>{
+    const l=S.logs.find(x=>x.id===d.id); if(!l) return;
+    const dash='–';
+    const zeilen=[
+      ['Art',esc(l.type||dash)],
+      ['Kategorie',esc(l.category||dash)],
+      ['Datum',l.date?dt(l.date):dash],
+      ['Kilometerstand',l.km?km(l.km):dash],
+      ['Kosten',l.cost?eur(l.cost):dash]
+    ];
+    const docs=docsOf(l.id);
+    const teile=partsOf(l.id);
+    openSheet(l.title||'Eintrag',
+      `<div class="stats">${zeilen.map(z=>`<div class="stat"><span>${z[0]}</span><b class="long">${z[1]}</b></div>`).join('')}</div>`+
+      (l.note?`<label>Notiz</label><p class="rmeta nl">${esc(l.note)}</p>`:'')+
+      `<label>Dokumente</label>`+
+      (docs.length?docs.map(doc=>`
+        <button class="item" data-a="openDoc" data-id="${doc.id}">
+          <div class="ico" data-thumb="${doc.id}">${doc.type==='pdf'?'PDF':'…'}</div>
+          <div class="mid"><div class="t">${esc(doc.title)}</div><div class="s">${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}</div></div>
+        </button>`).join('')
+       :'<p class="dhint">Nichts angehängt.</p>')+
+      `<label>Teile</label>`+
+      (teile.length?`<div class="dlist">${teile.map(p=>`<div class="d">
+          <div class="ic">${esc(p.status?p.status.slice(0,2):'TL')}</div>
+          <div class="n">${esc(p.name)}<small>${esc(p.category)}${p.price?' · '+eur(p.price):''}${p.partno?' · '+esc(p.partno):''}</small></div>
+        </div>`).join('')}</div>
+        <p class="dhint">Ihr Preis steckt in den Kosten dieses Eintrags und zählt in der Gesamtsumme nicht noch einmal mit. Geändert werden Teile im Reiter Teile.</p>`
+       :'<p class="dhint">Kein Teil verknüpft.</p>'),
+      null,null,
+      `<button class="btn ghost ico" data-a="editLog" data-id="${l.id}" aria-label="Eintrag bearbeiten"><svg viewBox="0 0 24 24">${ICONS.edit}</svg></button>`);
+    // Die Vorschaubilder der Dokumente nachziehen - hydrateImages deckt nur
+    // die Reiter ab, nicht ein offenes Blatt.
+    for(const doc of docs) if(doc.type==='image') loadImg('img:'+doc.id).then(data=>{
+      const el=document.querySelector(`#sbody [data-thumb="${doc.id}"]`);
+      if(data&&el){ el.style.backgroundImage=`url(${data})`; el.textContent=''; }
+    });
+  },
+
   addLog:()=>A.editLog({}),
   editLog:d=>{
     const l=S.logs.find(x=>x.id===d.id)||{date:today(),type:'Reparatur',category:'Motor'};
@@ -1716,6 +1840,18 @@ const A={
       `<div class="two">${field('Datum','date',l.date,'date')}${field('Kilometerstand','km',l.km||'','number','inputmode="numeric"')}</div>`+
       field('Kosten (€)','cost',l.cost||'','number','inputmode="decimal" step="0.01"')+
       `<label>Notiz</label><textarea name="note">${esc(l.note)}</textarea>`+
+      // Das Teile-Formular steht in data-nebenform: Seine Felder gehören nicht
+      // an den Logbuch-Eintrag, und vals() überspringt sie deshalb.
+      `<label>Teile</label>
+       <div class="dlist" id="logParts"></div>
+       <div data-nebenform id="logPartForm">
+         <div class="two">${field('Bezeichnung','pName','','text','placeholder="z. B. Zahnriemensatz"')}${select('Kategorie','pCat',PARTCATS,l.category)}</div>
+         <div class="two">${field('Preis (€)','pPrice','','number','inputmode="decimal" step="0.01"')}${field('Teilenummer','pNo')}</div>
+         <div class="actions"><button class="btn wide" data-a="logPartNeu">Teil hinzufügen</button></div>
+         <label>Oder ein vorhandenes Teil verknüpfen</label>
+         <div class="two"><select name="pPick" id="logPartPick"></select><button class="btn" data-a="logPartAn">Verknüpfen</button></div>
+       </div>
+       <p class="dhint">Verknüpfte Teile stehen auch im Reiter Teile – sie liegen dort und nicht doppelt. Das × löst sie nur von diesem Eintrag. Ihr Preis steckt in den Kosten dieses Eintrags und zählt in der Gesamtsumme nicht noch einmal mit.</p>`+
       `<label>Dokumente</label>
        <div class="filebox"><button class="btn" data-a="pickCam">Scannen</button><button class="btn" data-a="pickFile">Datei wählen</button></div>
        <input type="file" id="fCam" accept="image/*" capture="environment" hidden>
@@ -1747,16 +1883,27 @@ const A={
         }));
         // Gelöste Dokumente verlieren nur den Bezug, nicht ihr Dasein.
         for(const id of logDocs.off){ const doc=S.docs.find(x=>x.id===id); if(doc) delete doc.logId; }
+        // Teile: neu angelegte dazu, vorgemerkte verknüpfen, gelöste nur lösen.
+        for(const n of logParts.add) S.parts.push({
+          id:uid(), logId, name:n.name, category:n.category, status:'Verbaut',
+          price:n.price, date:o.date||today(), vendor:'', partno:n.partno, note:''
+        });
+        for(const id of logParts.an){ const p=S.parts.find(x=>x.id===id); if(p) p.logId=logId; }
+        for(const id of logParts.off){ const p=S.parts.find(x=>x.id===id); if(p) delete p.logId; }
         bumpKm(o.km); await save(); dismissModal();
       },
       isNew?null:async()=>{
-        // Der Eintrag geht, seine Dokumente bleiben: Eine Rechnung ist auch
-        // ohne den Eintrag noch etwas wert.
+        // Der Eintrag geht, seine Dokumente und Teile bleiben: Eine Rechnung
+        // ist auch ohne den Eintrag noch etwas wert, ein Teil erst recht.
+        // Der Bezug muss weg, sonst fiele das Teil dauerhaft aus der
+        // Kostensumme - die lässt verknüpfte Teile ja aus.
         for(const doc of docsOf(l.id)) delete doc.logId;
+        for(const p of partsOf(l.id)) delete p.logId;
         S.logs=S.logs.filter(x=>x.id!==l.id); await save(); dismissModal();
       });
     logDocs={logId,add:[],off:[]};
-    renderLogDocs();
+    logParts={logId,add:[],an:[],off:[]};
+    renderLogDocs(); renderLogParts();
   },
   logDocOff:(d)=>{
     if(!logDocs) return;
@@ -1764,6 +1911,31 @@ const A={
     logDocs.add=logDocs.add.filter(n=>n.tmp!==d.id);
     if(logDocs.add.length===vorher&&!logDocs.off.includes(d.id)) logDocs.off.push(d.id);
     renderLogDocs();
+  },
+  logPartNeu:()=>{
+    if(!logParts) return;
+    const f=nebenVals('#logPartForm');
+    if(!f.pName) return showErr('Bitte eine Bezeichnung für das Teil eintragen.');
+    logParts.add.push({tmp:uid(),name:f.pName,category:f.pCat||'Sonstiges',price:f.pPrice||'',partno:f.pNo||''});
+    for(const n of ['pName','pPrice','pNo']){ const el=document.querySelector(`#logPartForm [name="${n}"]`); if(el) el.value=''; }
+    showErr(''); renderLogParts();
+  },
+  logPartAn:()=>{
+    if(!logParts) return;
+    const w=$('#logPartPick'); const id=w&&w.value;
+    if(!id) return showErr('Bitte erst ein vorhandenes Teil auswählen.');
+    if(!logParts.an.includes(id)) logParts.an.push(id);
+    logParts.off=logParts.off.filter(x=>x!==id);
+    showErr(''); renderLogParts();
+  },
+  logPartOff:(d)=>{
+    if(!logParts) return;
+    const vorher=logParts.add.length;
+    logParts.add=logParts.add.filter(n=>n.tmp!==d.id);
+    if(logParts.add.length!==vorher) return renderLogParts();
+    logParts.an=logParts.an.filter(x=>x!==d.id);
+    if(!logParts.off.includes(d.id)) logParts.off.push(d.id);
+    renderLogParts();
   },
 
   addPart:()=>A.editPart({}),
@@ -1892,9 +2064,16 @@ addEventListener('popstate',e=>{
   // Wir landen auf einem Modal, das noch darunterliegt: Dann ist nur die
   // oberste Schicht gemeint. Das Sheet bleibt stehen, mitsamt allem, was
   // schon hineingetippt wurde - deshalb hier auch kein render().
+  // Geschlossen wird die Schicht, die wir verlassen - der Stapel weiß, welche
+  // das war. Vorher stand hier fest closeEdit(), weil der Zuschnitt über einem
+  // Sheet die einzige Stapelung war. Seit das Leseblatt eines Logbuch-Eintrags
+  // ein Dokument im Vollbild öffnet, gibt es eine zweite, und die blieb damit
+  // offen stehen.
   if(st.s==='modal'){
-    modalStack.pop();
-    closeEdit();
+    const verlassen=modalStack.pop();
+    if(verlassen==='full') closeFull();
+    else if(verlassen==='edit') closeEdit();
+    else closeSheet();
     return;
   }
   modalStack=[];

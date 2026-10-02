@@ -233,7 +233,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='14';
+const APP_VERSION='15';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='', backupNote='';
@@ -979,7 +979,7 @@ function viewPart(){
     const items=list.filter(p=>p.category===g);
     return `<div class="grp"><span>${g}</span><span>${eur(items.reduce((a,p)=>a+Number(p.price||0),0))}</span></div>`+
     items.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(p=>`
-    <button class="item" data-a="editPart" data-id="${p.id}">
+    <button class="item" data-a="openPart" data-id="${p.id}">
       <div class="ico">${esc(p.status.slice(0,2))}</div>
       <div class="mid"><div class="t">${esc(p.name)}</div><div class="s">${esc(p.status)}${p.date?' · '+dt(p.date):''}${p.vendor?' · '+esc(p.vendor):''}${partBezug(p)}</div></div>
       <div class="r">${p.price?eur(p.price):''}${p.partno?`<small>${esc(p.partno)}</small>`:''}</div>
@@ -1196,7 +1196,10 @@ function openFull(doc,data){
   f.innerHTML=`<div class="fbar">
       <button class="btn ghost ico" data-a="closeFull" aria-label="Schließen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button>
       <div class="ft"><b>${esc(doc.title)}</b><span>${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}${docBezug(doc)}</span></div>
-      <button class="btn ghost danger" data-a="delFull">Löschen</button>
+      <!-- Ansehen heißt ansehen: Hier stand der Knopf "Löschen", also eine
+           Aktion, die etwas verändert. Gelöscht wird jetzt in der Maske hinter
+           dem Stift - wie beim Fahrzeug, beim Logbuch-Eintrag und beim Teil. -->
+      <button class="btn ghost ico" data-a="editDoc" data-id="${doc.id}" aria-label="Dokument bearbeiten"><svg viewBox="0 0 24 24">${ICONS.edit}</svg></button>
     </div>
     <div class="fimg"><img alt="${esc(doc.title)}" src="${data}"></div>`;
   f.hidden=false;
@@ -1938,6 +1941,28 @@ const A={
     renderLogParts();
   },
 
+  /* Ein Teil öffnet zum Lesen, nicht zum Bearbeiten - wie der Logbuch-Eintrag
+     seit Fassung 14. Der Stift in der Ecke des Blattes führt in die Maske. */
+  openPart:d=>{
+    const p=S.parts.find(x=>x.id===d.id); if(!p) return;
+    const dash='–';
+    const zeilen=[
+      ['Kategorie',esc(p.category||dash)],
+      ['Status',esc(p.status||dash)],
+      ['Preis',p.price?eur(p.price):dash],
+      ['Kaufdatum',p.date?dt(p.date):dash],
+      ['Händler',esc(p.vendor||dash)],
+      ['Teilenummer',esc(p.partno||dash)]
+    ];
+    const l=p.logId&&S.logs.find(x=>x.id===p.logId);
+    openSheet(p.name||'Teil',
+      `<div class="stats">${zeilen.map(z=>`<div class="stat"><span>${z[0]}</span><b class="long">${z[1]}</b></div>`).join('')}</div>`+
+      (p.note?`<label>Notiz</label><p class="rmeta nl">${esc(p.note)}</p>`:'')+
+      (l?`<p class="dhint">Gehört zum Logbuch-Eintrag <b>${esc(l.title)}</b>. Der Preis steckt in den Kosten dieses Eintrags und zählt in der Gesamtsumme nicht noch einmal mit.</p>`:''),
+      null,null,
+      `<button class="btn ghost ico" data-a="editPart" data-id="${p.id}" aria-label="Teil bearbeiten"><svg viewBox="0 0 24 24">${ICONS.edit}</svg></button>`);
+  },
+
   addPart:()=>A.editPart({}),
   editPart:d=>{
     const p=S.parts.find(x=>x.id===d.id)||{date:today(),category:(partFilter!=='Alle'?partFilter:'Motor'),status:'Verbaut'};
@@ -1986,8 +2011,36 @@ const A={
     const view=!data?'<p class="meta">Datei nicht gefunden.</p>'
       :'<button class="btn primary" style="display:block;width:100%" data-a="savePdf">PDF öffnen oder sichern</button>';
     pendingDoc=(data&&doc.type==='pdf')?{name:doc.title.replace(/[^\w -]+/g,'_')+'.pdf',data}:null;
-    openSheet(doc.title,`<div class="viewer"><div class="meta">${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}${docBezug(doc)}</div>${view}</div>`,null,
-      async()=>{await removeDoc(doc);dismissModal();});
+    // Auch hier kein Löschen mehr: Der Stift in der Ecke führt in die Maske.
+    openSheet(doc.title,`<div class="viewer"><div class="meta">${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}${docBezug(doc)}</div>${view}</div>`,
+      null,null,
+      `<button class="btn ghost ico" data-a="editDoc" data-id="${doc.id}" aria-label="Dokument bearbeiten"><svg viewBox="0 0 24 24">${ICONS.edit}</svg></button>`);
+  },
+  /* Bis Fassung 14 ließ sich ein Dokument überhaupt nicht ändern: Titel,
+     Kategorie und Datum wurden beim Anlegen gesetzt und waren danach nur noch
+     löschbar. Ein falsch benanntes Dokument blieb falsch. Die Datei selbst
+     bleibt unberührt - kein Austauschen, kein erneuter Zuschnitt. */
+  editDoc:d=>{
+    const doc=S.docs.find(x=>x.id===d.id); if(!doc) return;
+    /* Aus dem Vollbild heraus weicht das Vollbild der Maske, statt sich damit
+       zu stapeln. Zwei Gründe, beide beim Prüfen aufgefallen:
+       #full liegt auf z-index 30 und #sheet auf 20 - die Maske öffnete sich
+       also hinter dem Bild und war nicht anzutippen. Und es gibt nur ein
+       Blatt-Element: Käme das Vollbild selbst aus einem Leseblatt (Dokument an
+       einem Logbuch-Eintrag), überschriebe die Maske dieses Leseblatt still.
+       Alles zu und von vorn ist hier das Ehrlichere. */
+    if(!$('#full').hidden) replaceModalWith();
+    openSheet('Dokument bearbeiten',
+      field('Titel','title',doc.title,'text','placeholder="z. B. TÜV-Gutachten 2026"')+
+      `<div class="two">${select('Kategorie','category',DOCCATS,doc.category)}${field('Datum','date',doc.date||'','date')}</div>`+
+      `<label>Notiz</label><textarea name="note">${esc(doc.note)}</textarea>`+
+      `<p class="dhint">Die Aufnahme selbst bleibt, wie sie ist. Soll ein anderes Bild hinein, lege das Dokument neu an.</p>`,
+      async()=>{
+        const o=vals(); if(!o.title) return showErr('Bitte einen Titel eintragen.');
+        Object.assign(doc,o);
+        await save(); dismissModal();
+      },
+      async()=>{ await removeDoc(doc); dismissModal(); });
   },
   // --- Kamera ---
   ausloesen:()=>{
@@ -2041,11 +2094,6 @@ const A={
   },
 
   closeFull:()=>dismissModal(),
-  delFull:async(d,el)=>{
-    if(!el.dataset.armed){el.dataset.armed=1;el.textContent='Wirklich löschen?';return;}
-    if(!fullDoc) return;
-    await removeDoc(fullDoc); dismissModal();
-  },
   savePdf:async()=>{
     if(!pendingDoc) return;
     try{ await saveFile(pendingDoc.name,dataToBlob(pendingDoc.data)) }

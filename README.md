@@ -40,7 +40,8 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
   aufhellen. Gespeicherte Bilder öffnen formatfüllend und lassen sich mit zwei
   Fingern vergrößern.
 - **Teile** – gekaufte Teile mit Kategorie, Status (verbaut / auf Lager /
-  bestellt), Preis, Händler und Teilenummer.
+  bestellt), Preis, Händler und Teilenummer. Ein Teil öffnet zum Lesen,
+  bearbeitet wird über den Stift in der Ecke.
 - **TÜV-Erinnerung** – Export eines `.ics`-Termins mit Erinnerungen 30 und
   7 Tage vor Ablauf.
 - **Zurück-Geste** – die Zurück-Geste des Handys geht einen Schritt zurück,
@@ -117,6 +118,31 @@ nichts Neues. *Entfernen* wirkt ebenso erst beim Speichern.
 Durch den Zuschnitt aus dem Abschnitt oben geht das Titelbild bewusst **nicht**:
 Ein Autofoto ist kein Dokument, Geraderücken und Dokument-Modus wären hier
 verkehrt.
+
+## Ansehen und ändern — überall derselbe Weg
+
+In allen vier Reitern gilt dasselbe: **Antippen heißt ansehen.** Geändert wird
+über den **Stift oben rechts in der Ecke** — in der Kopfzeile bei der
+Fahrzeugkarte, in der Ecke des Blattes beim Logbuch-Eintrag und beim Teil, in
+der Leiste der Vollbildanzeige beim Dokument. Gelöscht wird nur dort, hinter dem
+Stift.
+
+| Antippen | zeigt | Stift führt zu |
+| --- | --- | --- |
+| Fahrzeug | die Karte | Fahrzeugdaten |
+| Logbuch-Eintrag | Leseblatt | Eintrag bearbeiten |
+| Dokument (Bild) | Vollbild | Dokument bearbeiten |
+| Dokument (PDF) | Blatt mit *PDF öffnen* | Dokument bearbeiten |
+| Teil | Leseblatt | Teil bearbeiten |
+
+**Ein Dokument ließ sich bis Fassung 14 überhaupt nicht ändern** — Titel,
+Kategorie und Datum wurden beim Anlegen gesetzt und waren danach nur noch
+löschbar. Seit Fassung 15 gibt es die Maske dafür. Die **Aufnahme selbst** bleibt
+darin unberührt: Soll ein anderes Bild hinein, legst du das Dokument neu an.
+
+Beim Dokument weicht die Vollbildanzeige der Maske, statt sich damit zu
+stapeln — eine Schicht zur Zeit. Nach Zurück, Speichern oder Löschen landest du
+deshalb in der Dokumentenliste und nicht wieder beim Bild.
 
 ## Dokumente ansehen und vergrößern
 
@@ -363,6 +389,7 @@ die App:
 | `karte` | letzter Service aus Logbuch und Handfeld, Titelbild in der Maske, Höhe des Bildbereichs |
 | `speicher` | gestellte Lesefehler verlieren keine Daten, Datenrettung in beiden Speichern, ehrliche Speicheranzeige, Sicherungsmahnung |
 | `logteile` | Leseblatt ohne Eingabefelder, Teile anlegen und verknüpfen, die Kostenregel mit zwei Zahlen nachgerechnet |
+| `lesen` | Dokument und Teil nur ansehen, Ändern über den Stift, Bilddatei am Speicher geprüft |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter

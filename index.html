@@ -187,6 +187,11 @@ input.upper{text-transform:uppercase}
 .dhint{color:var(--muted);font-size:12px;margin:8px 2px 0}
 /* Titelbild in der Bearbeiten-Maske: Vorschau im selben Seitenverhältnis wie
    auf der Karte, damit man vor dem Speichern sieht, was ankommt. */
+/* Ein Fahrzeug, dessen Datensatz sich nicht lesen ließ: sichtbar vorhanden,
+   aber nicht antippbar - es gibt nichts zu öffnen. */
+.card.mini.tot{background:var(--line);box-shadow:none;cursor:default}
+.card.mini.tot .mh b{color:var(--warn)}
+.card.mini.tot .ms{color:var(--muted);font-size:12px}
 .cbox{margin-top:6px;aspect-ratio:4/3;border-radius:12px;border:1px solid var(--line);background:var(--bg) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
 
 /* Einstellungen */
@@ -221,7 +226,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='12';
+const APP_VERSION='13';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='', backupNote='';
@@ -272,20 +277,74 @@ const BACKENDS={
   }
 };
 let B=BACKENDS.mem;
+/* Welcher Speicher es wirklich ist, im Klartext - und ob er geschützt ist.
+   Vorher stand beides in einem einzigen "persistent", das bloß "nicht der
+   Arbeitsspeicher" bedeutete. In den Einstellungen stand deshalb "dauerhaft",
+   auch wenn es localStorage war und auch wenn der Browser den Schutz verweigert
+   hatte: Das Ergebnis von persist() wurde angefragt und weggeworfen. Hätte dort
+   die Wahrheit gestanden, wäre vor einem Verlust zu sehen gewesen, dass es ihn
+   geben kann. */
+let speicherArt='mem';
+let geschuetzt=null;    // true / false / null = der Browser sagt es nicht
+let belegung=null;      // {used,quota} oder null
+const SPEICHERNAME={
+  host:'Host-API', idb:'IndexedDB',
+  ls:'localStorage (Notnagel)', mem:'Arbeitsspeicher (flüchtig)'
+};
 async function initStore(){
   for(const n of ['host','idb','ls','mem']){
-    try{ await BACKENDS[n].probe(); B=BACKENDS[n]; break; }catch(e){}
+    try{ await BACKENDS[n].probe(); B=BACKENDS[n]; speicherArt=n; break; }catch(e){}
   }
   persistent=B!==BACKENDS.mem;
-  // Dauerhafte Ablage anfragen, damit der Browser die Akte nicht bei Platzmangel räumt
-  if(persistent&&navigator.storage&&navigator.storage.persist){ try{await navigator.storage.persist()}catch(e){} }
+  // Dauerhafte Ablage anfragen, damit der Browser die Akte nicht bei Platzmangel
+  // räumt - und das Ergebnis diesmal behalten, statt es wegzuwerfen.
+  if(persistent&&navigator.storage&&navigator.storage.persist){
+    try{
+      geschuetzt=await navigator.storage.persist();
+      // persist() liefert false auch dann, wenn der Schutz längst besteht und
+      // nur die erneute Anfrage abgelehnt wurde. Deshalb nachfragen.
+      if(!geschuetzt&&navigator.storage.persisted) geschuetzt=await navigator.storage.persisted();
+    }catch(e){ geschuetzt=null }
+  }
+  if(persistent&&navigator.storage&&navigator.storage.estimate){
+    try{ const e=await navigator.storage.estimate(); belegung={used:e.usage,quota:e.quota} }catch(e){}
+  }
 }
 const store={
   async get(k){ try{return await B.get(k)}catch(e){return null} },
+  /* Wie get, aber ein Fehler bleibt ein Fehler. get() gibt bei jeder Störung
+     null zurück - damit ist "Lesen fehlgeschlagen" von "nichts da" nicht zu
+     unterscheiden, und genau daran hing der Datenverlust: Der Start hielt ein
+     ungelesenes Fahrzeug für ein nicht vorhandenes und strich es. Wo der
+     Unterschied zählt, wird lese() benutzt. */
+  async lese(k){ return await B.get(k) },
   async set(k,v){ try{await B.set(k,v);return true}catch(e){return false} },
-  async del(k){ try{await B.del(k)}catch(e){} }
+  async del(k){ try{await B.del(k)}catch(e){} },
+  /* Alle Schlüssel eines Speichers - für die Datenrettung. Gefragt wird
+     ausdrücklich auch der gerade *nicht* benutzte Speicher: Rutscht die App
+     still von IndexedDB auf localStorage ab, liegen die Daten im anderen. */
+  async keys(name){
+    try{
+      if(name==='idb') return window.indexedDB?await tx('readonly',s=>s.getAllKeys()):[];
+      if(name==='ls') return Object.keys(localStorage);
+      if(name==='mem') return Object.keys(mem);
+    }catch(e){}
+    return [];
+  },
+  async hole(name,k){
+    try{
+      if(name==='idb') return (await tx('readonly',s=>s.get(k)))??null;
+      if(name==='ls') return localStorage.getItem(k);
+      if(name==='mem') return mem[k]??null;
+    }catch(e){}
+    return null;
+  }
 };
-const saveIndex=()=>store.set('akte:index',JSON.stringify({ids:IDX}));
+/* Solange nicht geklärt ist, was im Speicher steht, darf die Liste nicht
+   geschrieben werden - sonst überschreibt der erste Speichervorgang eine
+   Liste, die wir nur nicht lesen konnten. */
+let gesperrt=false;
+const saveIndex=()=>gesperrt?Promise.resolve(false):store.set('akte:index',JSON.stringify({ids:IDX}));
 const save=async()=>{await store.set('akte:v:'+S.id,JSON.stringify(S));await saveIndex();};
 const coverKey=id=>'img:cover:'+id;
 async function loadImg(key){
@@ -583,7 +642,9 @@ function renderGarage(){
   $('#nav').style.display='none';
   $('#title').textContent='Garage'; $('#sub').textContent=IDX.length?IDX.length+(IDX.length===1?' Fahrzeug':' Fahrzeuge'):'';
   $('#topBtn').innerHTML=`<button class="btn ghost ico" data-a="settings" aria-label="Einstellungen"><svg viewBox="0 0 24 24">${ICONS.gear}</svg></button>`;
-  const list=IDX.map(id=>VEH[id]);
+  // Unlesbare Kennungen bleiben in IDX stehen, damit die Liste sie nicht
+  // verliert - gezeichnet werden sie aber als Platzhalter, nicht als Karte.
+  const list=IDX.map(id=>VEH[id]).filter(Boolean);
   const due=list.filter(x=>{const i=tuevInfo(x.v);return i&&i.c!=='ok'});
   const banner=due.length?`<div class="alert" role="status">${due.map(x=>{const i=tuevInfo(x.v);return `<button data-a="open" data-id="${x.id}"><b>${esc(x.v.name||'Fahrzeug')}</b>: <span class="${i.c}">TÜV ${i.c==='danger'?'abgelaufen':'fällig'} (${i.t})</span></button>`}).join('')}</div>`:'';
   const cards=list.map(x=>{
@@ -594,13 +655,38 @@ function renderGarage(){
       <div class="ms">${x.v.plate?`<span class="plate flat">${esc(x.v.plate)}</span>`:'<span>Kein Kennzeichen</span>'}</div>
       <div class="ms sub"><span>${x.v.km?km(x.v.km):'–'}</span>${i?`<span class="pill ${i.c}">TÜV ${dt(x.v.tuev)}</span>`:''}</div>
     </div></button>`}).join('');
+  // Ein Fahrzeug, dessen Datensatz sich nicht lesen ließ, verschweigt die App
+  // nicht und streicht es auch nicht. Es steht als Platzhalter da, und seine
+  // Kennung bleibt in der Liste.
+  const kaputt=IDX.filter(id=>!VEH[id]).map(id=>
+    `<div class="card mini tot"><div class="card-in">
+      <div class="photo"><div class="ph">Nicht lesbar</div></div>
+      <div class="mh"><b>Fahrzeug nicht lesbar</b><span>Kennung ${esc(id)}</span></div>
+      <div class="ms"><span>Der Datensatz ließ sich nicht öffnen.</span></div>
+      <div class="ms sub"><span>Einstellungen → Datenrettung</span></div>
+    </div></div>`).join('');
   // Die stille Update-Prüfung beim Start meldet sich nur, wenn es etwas gibt.
-  const upd=updateReady?`<div class="alert" role="status"><button data-a="settings"><b>Neue Fassung ${esc(updateReady)} liegt bereit</b><span> – App einmal schließen und neu öffnen.</span></button></div>`:'';
-  $('#view').innerHTML=upd+(list.length
-    ?banner+`<div class="grid">${cards}<button class="add" data-a="addVehicle"><b>+</b>Fahrzeug hinzufügen</button></div>`
+  const upd=updateReady?`<div class="alert" id="updAlert" role="status"><button data-a="settings"><b>Neue Fassung ${esc(updateReady)} liegt bereit</b><span> – App einmal schließen und neu öffnen.</span></button></div>`:'';
+  $('#view').innerHTML=upd+speicherAlarm()+(list.length||kaputt
+    ?banner+`<div class="grid">${cards}${kaputt}<button class="add" data-a="addVehicle"><b>+</b>Fahrzeug hinzufügen</button></div>`
     :`<div class="empty"><b>Deine Garage ist leer</b>Lege dein erstes Fahrzeug an. Jedes bekommt eine eigene Karte.</div><div class="actions"><button class="btn primary" data-a="addVehicle">Erstes Fahrzeug anlegen</button></div>`);
   (persistent||!IDX.length)||($('#view').insertAdjacentHTML('beforeend','<p class="note warn">Hinweis: Speichern ist in dieser Umgebung nicht verfügbar. Daten gehen beim Schließen verloren.</p>'));
   hydrateImages();
+}
+
+/* Hinweise, die nicht in den Einstellungen versteckt gehören: Der Speicher war
+   nicht lesbar, der Browser darf die Akte räumen, oder die letzte Sicherung ist
+   alt. Gegen ein Räumen hilft kein Code in der App - nur eine aktuelle
+   Sicherung. Deshalb steht das hier, wo man es sieht. */
+function speicherAlarm(){
+  const hin=[];
+  if(gesperrt) hin.push(`<b>Der Speicher ließ sich nicht lesen</b><span> – es wurde nichts geändert. Bitte nichts anlegen, erst in den Einstellungen nachsehen.</span>`);
+  if(speicherArt==='ls') hin.push(`<b>Die Akte liegt im Notspeicher</b><span> – dort ist nur wenig Platz. In den Einstellungen steht, was das heißt.</span>`);
+  if(geschuetzt===false) hin.push(`<b>Der Speicher ist nicht geschützt</b><span> – der Browser darf die Akte bei Platzmangel räumen. Sichere sie regelmäßig.</span>`);
+  const alt=sicherungAlter();
+  if(alt===null) hin.push(`<b>Noch keine Sicherung</b><span> – ohne sie gibt es keinen Weg zurück.</span>`);
+  else if(alt>SICHERUNG_FRIST) hin.push(`<b>Letzte Sicherung vor ${alt} Tagen</b><span> – Zeit für eine neue.</span>`);
+  return hin.length?`<div class="alert" id="speicherAlarm" role="status">${hin.map(h=>`<button data-a="settings">${h}</button>`).join('')}</div>`:'';
 }
 
 /* ---------- Einstellungen ----------
@@ -614,6 +700,8 @@ function renderSettings(){
   // die Betriebssystem-Kennung. Geprüft wird mit genau der Art Datei, die
   // später auch wirklich herausgeht.
   const teilen=kannTeilen(backupName(),BACKUP_TYP);
+  const alt=sicherungAlter();
+  const mb=n=>(n/1048576).toLocaleString('de-DE',{maximumFractionDigits:1})+' MB';
   $('#view').innerHTML=`
     <section class="sect">
       <h2>Sicherung</h2>
@@ -621,7 +709,11 @@ function renderSettings(){
         <button class="btn ghost" data-a="backupOut"${IDX.length?'':' disabled'}>Sicherung speichern</button>
         <button class="btn ghost" data-a="backupIn">Sicherung einlesen</button>
       </div>
+      <div class="stats">
+        <div class="stat"><span>Letzte Sicherung</span><b class="long" id="sicherStat">${sicherungDatum?esc(dt(sicherungDatum))+(alt?' · vor '+alt+(alt===1?' Tag':' Tagen'):' · heute'):'noch keine'}</b></div>
+      </div>
       <p class="note">Die Sicherung enthält alle Fahrzeuge samt Fotos und Dokumenten. Sie ist dein einziges Backup und der Weg, die Akte auf ein anderes Gerät zu holen.</p>
+      <p class="note">Vermerkt ist der Tag, an dem die App die Datei herausgegeben hat – nicht, dass sie irgendwo angekommen ist. Das weiß die App nicht.</p>
       <p class="note" id="shareNote">${teilen
         ?'Beim Speichern öffnet sich das Teilen-Blatt. Dort <b>Drive</b> wählen und den Ordner <b>Car Collection / Sicherung</b> ansteuern – dann liegt die Sicherung nicht nur auf diesem Gerät. Die Datei endet auf <b>.txt</b>, weil Chrome nur solche Dateien teilt; ihr Inhalt ist unverändert.'
         :'Die Sicherung wird heruntergeladen. Leg sie danach selbst in Drive ab, damit sie nicht nur auf diesem Gerät liegt.'}</p>
@@ -631,15 +723,112 @@ function renderSettings(){
       <h2>Updates</h2>
       <div class="stats">
         <div class="stat"><span>Fassung</span><b>${esc(APP_VERSION)}</b></div>
-        <div class="stat"><span>Speicher</span><b>${persistent?'dauerhaft':'flüchtig'}</b></div>
       </div>
       <div class="actions"><button class="btn ghost wide" data-a="checkUpdate">Nach Updates suchen</button></div>
       ${updateNote?`<p class="note" id="upNote">${esc(updateNote)}</p>`:''}
     </section>
     <section class="sect">
+      <h2>Speicher</h2>
+      <div class="stats">
+        <div class="stat"><span>Ablage</span><b class="long">${esc(SPEICHERNAME[speicherArt]||speicherArt)}</b></div>
+        <div class="stat"><span>Vor dem Räumen geschützt</span><b class="long">${
+          geschuetzt===true?'ja':geschuetzt===false?'nein':'sagt der Browser nicht'}</b></div>
+        ${belegung&&belegung.quota?`<div class="stat"><span>Belegt</span><b class="long">${esc(mb(belegung.used||0))} von ${esc(mb(belegung.quota))}</b></div>`:''}
+      </div>
+      ${geschuetzt===false?`<p class="note warn">Der Browser hat den Schutz nicht gewährt. Er darf die Akte dann bei Platzmangel räumen – ohne Rückfrage und ohne dass du etwas gelöscht hättest. Dagegen hilft nur eine aktuelle Sicherung.</p>`:''}
+      ${geschuetzt===null&&persistent?`<p class="note">Dieser Browser sagt nicht, ob die Akte vor dem Räumen geschützt ist. Sichere sie regelmäßig.</p>`:''}
+      ${speicherArt==='ls'?`<p class="note warn">Die Akte liegt im Notspeicher (localStorage). Der ist auf wenige MB begrenzt – Fotos sprengen ihn schnell. Das passiert, wenn IndexedDB sich nicht öffnen ließ. Es kann auch heißen, dass deine Daten noch in IndexedDB liegen und nur nicht gelesen wurden: Dann findet die Datenrettung sie.</p>`:''}
+      ${speicherArt==='mem'?`<p class="note warn">Es gibt in dieser Umgebung keinen Speicher. Alles geht beim Schließen verloren.</p>`:''}
+    </section>
+    <section class="sect">
+      <h2>Datenrettung</h2>
+      <p class="note">Sucht in <b>beiden</b> Speichern nach Fahrzeugdatensätzen – auch in dem, der gerade nicht benutzt wird. Rutscht die App still von IndexedDB auf den Notspeicher ab, liegen die Daten nämlich im anderen und die Garage sieht leer aus, obwohl alles da ist.</p>
+      <div class="actions"><button class="btn ghost wide" data-a="rettung">Speicher durchsuchen</button></div>
+      <div id="rettung">${rettungHtml()}</div>
+    </section>
+    <section class="sect">
       <h2>Deine Daten</h2>
       <p class="note">Fahrzeugdaten, Fotos und Dokumente liegen ausschließlich in diesem Browser. Nichts davon wird irgendwohin übertragen. Löschst du die Websitedaten oder deinstallierst die App, sind sie weg – deshalb die Sicherung.</p>
     </section>`;
+}
+
+/* ---------- Datenrettung ----------
+   Nach dem Verlust vom 02.10.2026: Ob Daten noch da sind oder wirklich weg,
+   ließ sich von außen nicht unterscheiden - die App hatte keinen Weg, in den
+   eigenen Speicher zu sehen. Dieser Bereich ist genau das. Ein leeres Ergebnis
+   wird ausdrücklich angezeigt, denn auch das ist eine Antwort. */
+let rettung=null;   // {funde:[{speicher,id,name,plate,logs,docs,parts,drin}], bilder:{idb,ls}}
+
+function rettungHtml(){
+  if(!rettung) return '';
+  const z=rettung.zahlen.map(s=>`<div class="stat"><span>${esc(SPEICHERNAME[s.name]||s.name)}</span><b class="long">${s.fahrzeuge} Fahrzeuge · ${s.bilder} Bilder</b></div>`).join('');
+  if(!rettung.funde.length)
+    return `<div class="stats">${z}</div>
+      <p class="note">Es liegt kein Fahrzeugdatensatz im Speicher, der nicht schon in der Garage steht. Verborgen ist also nichts – wenn Einträge fehlen, sind sie wirklich weg und nur über eine Sicherung zurückzuholen.</p>`;
+  const neu=rettung.funde.filter(f=>!f.drin);
+  return `<div class="stats">${z}</div>
+    <div class="dlist">${rettung.funde.map(f=>`<div class="d">
+      <div class="ic">${f.drin?'OK':'NEU'}</div>
+      <div class="n">${esc(f.name||'Fahrzeug ohne Namen')}<small>${esc(f.plate||'kein Kennzeichen')} · ${f.logs} Logbuch · ${f.docs} Dok. · ${f.parts} Teile · ${esc(SPEICHERNAME[f.speicher]||f.speicher)}${f.drin?' · steht schon in der Garage':''}</small></div>
+    </div>`).join('')}</div>
+    ${neu.length
+      ?`<div class="actions"><button class="btn primary wide" data-a="rettungHolen">${neu.length===1?'Fahrzeug':neu.length+' Fahrzeuge'} zurück in die Garage holen</button></div>`
+      :'<p class="note">Alle Funde stehen bereits in der Garage. Es gibt nichts zu holen.</p>'}`;
+}
+
+async function rettungSuchen(){
+  const funde=[], zahlen=[], gesehen=new Set();
+  for(const name of ['idb','ls']){
+    const keys=await store.keys(name);
+    const fahrzeugKeys=keys.filter(k=>typeof k==='string'&&k.startsWith('akte:v:'));
+    zahlen.push({name,fahrzeuge:fahrzeugKeys.length,bilder:keys.filter(k=>typeof k==='string'&&k.startsWith('img:')).length});
+    for(const k of fahrzeugKeys){
+      const id=k.slice(7);
+      if(gesehen.has(id)) continue;        // in beiden Speichern: einmal zeigt
+      const roh=await store.hole(name,k);
+      if(!roh) continue;
+      let x=null; try{ x=JSON.parse(roh) }catch(e){ continue }
+      if(!x||!x.v) continue;
+      gesehen.add(id);
+      funde.push({speicher:name,id,name:x.v.name||'',plate:x.v.plate||'',
+        logs:(x.logs||[]).length,docs:(x.docs||[]).length,parts:(x.parts||[]).length,
+        drin:!!VEH[id]&&IDX.includes(id)});
+    }
+  }
+  rettung={funde,zahlen};
+}
+
+/* Die Funde in die Garage holen. Geschrieben wird in den gerade benutzten
+   Speicher, damit sie dort auch beim nächsten Start gefunden werden - lag der
+   Datensatz im anderen, wäre er sonst beim nächsten Mal wieder verschwunden. */
+async function rettungHolen(){
+  if(!rettung) return;
+  let geholt=0, fehl=0;
+  for(const f of rettung.funde){
+    if(f.drin) continue;
+    const roh=await store.hole(f.speicher,'akte:v:'+f.id);
+    if(!roh){ fehl++; continue }
+    let x=null; try{ x=JSON.parse(roh) }catch(e){ fehl++; continue }
+    const basis=newVeh();
+    VEH[f.id]={...basis,...x,id:f.id,v:{...basis.v,...(x.v||{})},
+      logs:x.logs||[],parts:x.parts||[],docs:x.docs||[]};
+    if(!IDX.includes(f.id)) IDX.push(f.id);
+    // Bilder mitnehmen, wenn sie im anderen Speicher liegen.
+    if(f.speicher!==speicherArt){
+      if(!await store.set('akte:v:'+f.id,roh)){ fehl++; }
+      for(const schluessel of [coverKey(f.id),...(VEH[f.id].docs||[]).map(d=>'img:'+d.id)]){
+        const bild=await store.hole(f.speicher,schluessel);
+        if(bild) await store.set(schluessel,bild);
+      }
+    }
+    f.drin=true; geholt++;
+  }
+  // Ab hier ist der Zustand geklärt: Die Liste darf wieder geschrieben werden.
+  gesperrt=false;
+  await saveIndex();
+  await rettungSuchen();
+  render();
+  alert(geholt+(geholt===1?' Fahrzeug':' Fahrzeuge')+' zurückgeholt.'+(fehl?' '+fehl+' konnte(n) nicht gelesen werden.':''));
 }
 
 /* Die Versionsdatei liegt im Netz, nicht im Cache: Der Service Worker lässt sie
@@ -1307,6 +1496,17 @@ const BACKUP_TAGS=[BACKUP_TAG,'fahrzeugakte'];
 const BACKUP_TYP='text/plain';
 const backupName=()=>'carcollection-sicherung-'+today()+'.txt';
 let pendingBackup=null;
+/* Wann zuletzt gesichert wurde. Gegen ein Räumen durch den Browser hilft kein
+   Code in der App, nur eine aktuelle Sicherung - also muss die App daran
+   erinnern, statt es dem Gedächtnis zu überlassen. */
+const SICHERUNG_FRIST=30;
+let sicherungDatum='';
+const sicherungAlter=()=>{
+  if(!sicherungDatum) return null;
+  const t=Date.parse(sicherungDatum+'T00:00:00');
+  if(isNaN(t)) return null;
+  return Math.max(0,Math.floor((Date.now()-t)/864e5));
+};
 
 async function collectBackup(){
   const out={app:BACKUP_TAG,version:1,exported:new Date().toISOString(),vehicles:[],images:{}};
@@ -1450,6 +1650,15 @@ const A={
   // Die Einstellungen sind ein Bildschirm wie jeder andere: Schließen heißt zurück.
   closeSettings:()=>history.back(),
   checkUpdate:(d,el)=>{ el.disabled=true; el.textContent='Wird geprüft …'; checkUpdate(true) },
+  rettung:async(d,el)=>{
+    if(el){ el.disabled=true; el.textContent='Wird durchsucht …'; }
+    await rettungSuchen();
+    render();
+  },
+  rettungHolen:async(d,el)=>{
+    if(el){ el.disabled=true; el.textContent='Wird geholt …'; }
+    await rettungHolen();
+  },
   addVehicle:()=>vehicleSheet(true),
   editVehicle:()=>vehicleSheet(false),
   tuevIcs:async()=>{
@@ -1478,6 +1687,9 @@ const A={
       backupNote=weg==='geteilt'?'Die Sicherung ist im Teilen-Blatt. Wähle dort Drive.'
         :weg==='abgebrochen'?'Abgebrochen – es wurde nichts gespeichert.'
         :'Heruntergeladen. Das Teilen-Blatt bietet dein Browser für diese Datei nicht an.';
+      // Vermerkt wird, dass die Datei herausgegangen ist - nicht, dass sie
+      // irgendwo angekommen ist. Mehr weiß die App nicht.
+      if(weg!=='abgebrochen'){ sicherungDatum=today(); await store.set('akte:sicherung',sicherungDatum); }
     }catch(err){
       backupNote='';
       alert('Die Sicherung konnte nicht erstellt werden: '+err.message);
@@ -1735,8 +1947,21 @@ document.addEventListener('change',async e=>{
 /* ---------- Start ---------- */
 (async()=>{
   await initStore();
-  const idx=await store.get('akte:index');
-  if(idx){ try{IDX=JSON.parse(idx).ids||[];}catch(e){IDX=[];} }
+  sicherungDatum=(await store.get('akte:sicherung'))||'';
+  /* Die Liste der Fahrzeuge. Gelesen wird mit lese(), damit ein Fehler ein
+     Fehler bleibt: Vorher gab get() bei jeder Störung null zurück, die App
+     hielt das für eine leere Garage - und der erste Speichervorgang danach
+     überschrieb die Liste, die nur nicht lesbar gewesen war. Jetzt wird in
+     diesem Fall gesperrt und nichts geschrieben. */
+  let idx=null;
+  try{ idx=await store.lese('akte:index'); }
+  catch(e){ gesperrt=true; }
+  if(gesperrt){ /* nichts annehmen und nichts schreiben */ }
+  else if(idx){
+    // Unlesbares JSON ist genauso ungeklärt wie ein Lesefehler: Die Datensätze
+    // liegen womöglich alle noch da und werden über die Datenrettung gefunden.
+    try{ IDX=JSON.parse(idx).ids||[]; }catch(e){ IDX=[]; gesperrt=true; }
+  }
   else{
     // Übernahme der Daten aus der ersten Version (ein einzelnes Fahrzeug)
     const old=await store.get('akte:main');
@@ -1746,8 +1971,21 @@ document.addEventListener('change',async e=>{
       await store.set('akte:v:'+nv.id,JSON.stringify(nv)); IDX=[nv.id]; await saveIndex();
     }catch(e){} }
   }
-  for(const id of IDX){ const r=await store.get('akte:v:'+id); if(r){ try{VEH[id]=JSON.parse(r);}catch(e){} } }
-  IDX=IDX.filter(id=>VEH[id]);
+  /* Hier lag der Verlust: Ein Fahrzeug, dessen Datensatz sich nicht lesen ließ,
+     wurde aus der Liste gestrichen - und beim nächsten Speichern war es
+     dauerhaft daraus verschwunden, obwohl akte:v:<id> noch im Speicher lag.
+     Gestrichen wird jetzt nur noch, was nachweislich nicht da ist. Ein
+     Lesefehler lässt die Kennung stehen; die Garage zeigt dafür einen
+     Platzhalter. */
+  const unlesbar=[];
+  for(const id of IDX){
+    let roh=null;
+    try{ roh=await store.lese('akte:v:'+id); }
+    catch(e){ unlesbar.push(id); continue; }
+    if(roh===null||roh===undefined) continue;              // echte Waise
+    try{ VEH[id]=JSON.parse(roh); }catch(e){ unlesbar.push(id); }
+  }
+  IDX=IDX.filter(id=>VEH[id]||unlesbar.includes(id));
   // Nach einem Neuladen steht der zuletzt gezeigte Bildschirm noch im
   // History-Eintrag - den stellen wir wieder her, statt in die Garage zu
   // springen. Sonst verlöre ein Neuladen Fahrzeug und Reiter.
@@ -1757,7 +1995,8 @@ document.addEventListener('change',async e=>{
   history.replaceState({s:'garage'},'');
   if(st&&st.s==='vehicle'&&VEH[st.id]){ S=VEH[st.id]; view='vehicle'; tab=st.tab||'card'; pushScreen(); }
   else if(st&&st.s==='settings'){ view='settings'; pushScreen(); }
-  else if(IDX.length===1){ S=VEH[IDX[0]]; view='vehicle'; pushScreen(); }
+  // Nur springen, wenn das eine Fahrzeug auch lesbar war.
+  else if(IDX.length===1&&VEH[IDX[0]]){ S=VEH[IDX[0]]; view='vehicle'; pushScreen(); }
   render();
   // Service Worker: macht die Akte offline nutzbar (nur über http/https, nicht bei file://)
   if('serviceWorker' in navigator && location.protocol.startsWith('http')){

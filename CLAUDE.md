@@ -47,6 +47,22 @@ den Einstellungen entweder ewig ein Update oder verschweigt eines. Die CI
 vergleicht die drei Zahlen im Schritt `Fassungsnummern vergleichen` und bricht
 bei Abweichung ab — das ersetzt aber nicht, vorher selbst daran zu denken.
 
+**Ein Lesefehler ist kein Beweis, dass etwas fehlt.** Am 02.10.2026 war die
+Garage auf dem Gerät mit einem Mal leer. Im Code lagen drei Wege dorthin, und
+alle gingen von derselben Verwechslung aus: `store.get` gab bei jeder Störung
+`null` zurück, und der Start strich daraufhin Fahrzeuge aus der Liste. Deshalb:
+
+- Wo der Unterschied zählt, mit `store.lese` lesen — das wirft.
+- **Niemals Daten oder Verweise darauf streichen, weil ein Lesevorgang
+  fehlschlug.** Gestrichen wird nur, was nachweislich nicht da ist.
+- Ist der Zustand ungeklärt, **nichts schreiben** (`gesperrt`) und es sagen.
+
+**Nicht behaupten, was der Browser nicht zugesagt hat.** `navigator.storage
+.persist()` ist eine Anfrage, keine Zusage. Die Einstellungen zeigten lange
+„Speicher: dauerhaft", wo nur „nicht der Arbeitsspeicher" gemeint war — das ist
+dieselbe Regel wie oben, nur an der Oberfläche. Ergebnisse von Browser-APIs
+lesen und anzeigen, nicht annehmen.
+
 **Plattform-Weichen über Funktionsprüfung, nie über die Browserkennung.** Die
 App läuft auf Android (Chrome) und iOS (Safari); beide Pfade sind in
 `index.html` berücksichtigt und in `README.md` beschrieben.

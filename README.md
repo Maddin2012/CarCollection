@@ -16,6 +16,10 @@ Daraus folgen zwei Dinge:
 - Es gibt **kein** automatisches Backup. Löschst du die Website-Daten im Browser
   oder deinstallierst die App vom Homescreen, sind die Einträge weg. Nutze
   regelmäßig die Sicherung (siehe unten).
+- Der Browser kann die Daten auch **von sich aus** räumen, wenn der Speicher des
+  Geräts knapp wird und die Ablage nicht geschützt ist — ohne Rückfrage und ohne
+  dass du etwas gelöscht hättest. Die Einstellungen zeigen unter **Speicher**,
+  ob der Schutz besteht. Die Sicherung ist dagegen das einzige Mittel.
 
 Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
 
@@ -176,8 +180,54 @@ Läuft die App im Arbeitsspeicher, weist sie im Interface ausdrücklich darauf h
 IndexedDB statt `localStorage`, weil Bilder als Data-URL dessen ~5-MB-Grenze
 schnell sprengen. Bilder werden vor dem Speichern auf max. 1200 px (Titelbild)
 bzw. 1600 px (Dokumente) verkleinert und als JPEG abgelegt; PDFs sind auf
-3,5 MB begrenzt. Zusätzlich fragt die App per `navigator.storage.persist()` eine
-dauerhafte Ablage an, damit der Browser die Akte bei Platzmangel nicht räumt.
+3,5 MB begrenzt.
+
+### Angefragt ist nicht gewährt
+
+Die App fragt per `navigator.storage.persist()` eine dauerhafte Ablage an, damit
+der Browser die Akte bei Platzmangel nicht räumt. **Gewährt wird sie dadurch
+nicht** — das entscheidet der Browser nach eigenen Regeln, und er kann ablehnen.
+
+Bis Fassung 12 hat die App das Ergebnis der Anfrage weggeworfen und in den
+Einstellungen trotzdem „Speicher: dauerhaft" angezeigt. Das war keine Aussage
+über Dauerhaftigkeit, sondern nur „es ist nicht der Arbeitsspeicher" — es stand
+auch dann da, wenn die Akte im Notspeicher lag oder der Browser den Schutz
+verweigert hatte.
+
+Seit Fassung 13 stehen in den Einstellungen unter **Speicher** drei ehrliche
+Angaben: welche Ablage benutzt wird, ob sie **vor dem Räumen geschützt** ist
+(`navigator.storage.persisted()`), und wie viel belegt ist. Ist sie nicht
+geschützt, sagt die App das — und weist in der Garage darauf hin, denn dagegen
+hilft kein Code, nur eine aktuelle Sicherung.
+
+### Ein Lesefehler ist kein Beweis, dass etwas fehlt
+
+Bis Fassung 12 gab der Speicherzugriff bei jeder Störung `null` zurück. „Lesen
+fehlgeschlagen" war damit von „gibt es nicht" nicht zu unterscheiden — und der
+Start strich ein Fahrzeug, dessen Datensatz er nicht lesen konnte, aus der
+Liste. Beim nächsten Speichern war es daraus dauerhaft verschwunden, obwohl der
+Datensatz noch im Speicher lag.
+
+Seit Fassung 13:
+
+- Scheitert das Lesen **eines Fahrzeugs**, bleibt seine Kennung in der Liste.
+  In der Garage steht an seiner Stelle eine Kachel *Nicht lesbar*.
+- Scheitert das Lesen **der Liste**, gilt die Garage nicht als leer. Die App
+  sagt es und **schreibt nichts**, solange der Zustand ungeklärt ist.
+- Gestrichen wird nur noch, was nachweislich nicht da ist.
+
+### Datenrettung
+
+In den Einstellungen durchsucht **Datenrettung** beide Speicher — auch den, der
+gerade nicht benutzt wird. Das ist der Punkt: Rutscht die App still von
+IndexedDB auf den Notspeicher ab, liegen die Daten im anderen und die Garage
+sieht leer aus, obwohl alles da ist.
+
+Gefundene Fahrzeuge werden mit Name, Kennzeichen und Anzahlen aufgelistet und
+lassen sich in die Garage zurückholen; liegen sie im anderen Speicher, wandern
+sie dabei samt Bildern in den benutzten. **Auch ein leeres Ergebnis wird
+angezeigt** — dann ist nichts verborgen, sondern wirklich weg, und nur die
+Sicherung hilft.
 
 ## Sicherung
 
@@ -266,6 +316,7 @@ die App:
 | `kamera` | Kamerastufe mit vorgespieltem Gerät, Auslöser, Ende des Stroms, Rückfallebenen |
 | `vollbild` | Zoom und Schieben mit selbst erzeugten Zeiger-Ereignissen, Grenzen, Einpassen |
 | `karte` | letzter Service aus Logbuch und Handfeld, Titelbild in der Maske, Höhe des Bildbereichs |
+| `speicher` | gestellte Lesefehler verlieren keine Daten, Datenrettung in beiden Speichern, ehrliche Speicheranzeige, Sicherungsmahnung |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter

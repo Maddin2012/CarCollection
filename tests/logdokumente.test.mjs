@@ -158,10 +158,14 @@ export default async function ({ browser, base, ok }) {
   }), 'Die Bilddateien liegen weiterhin im Speicher');
 
   // --- Löschen im Reiter Dokumente entfernt sie wirklich ---
+  // Seit Fassung 15 steht in der Vollbildanzeige kein Löschen-Knopf mehr;
+  // gelöscht wird in der Maske hinter dem Stift.
   await page.click('[data-a="openDoc"]');
   await page.waitForSelector('#full:not([hidden])');
-  await page.click('[data-a="delFull"]');
-  await page.click('[data-a="delFull"]');
+  await page.click('.fbar [data-a="editDoc"]');
+  await page.waitForSelector('[name="title"]');
+  await page.click('.panel [data-a="del"]');
+  await page.click('.panel [data-a="del"]');
   await page.waitForFunction(() => document.querySelectorAll('.item').length === 1);
   ok((await docs()).length === 1, 'Im Reiter Dokumente lässt sich löschen');
 

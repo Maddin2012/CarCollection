@@ -255,6 +255,24 @@ export default async function ({ browser, base, ok }) {
     }
     return false;
   }, u);
+  // --- Das Manifest kommt nie aus dem Cache ---
+  // Es entscheidet, als welche App der Browser die Seite führt. Lag es wie
+  // jede andere Datei im Cache, erreichte eine Änderung daran - etwa eine neue
+  // Kennung - das Gerät nicht. Genau so ist es am 03.10.2026 passiert.
+  // Geprüft wird hart: Der Cache-Eintrag wird mit einem erfundenen Manifest
+  // überschrieben. Kommt der beim Abrufen zurück, liefert der Service Worker
+  // aus dem Cache und der Mangel ist wieder da.
+  await page.evaluate(async () => {
+    const c = await caches.open((await caches.keys())[0]);
+    await c.put('manifest.webmanifest', new Response(
+      JSON.stringify({ name: 'AUS DEM CACHE', id: '/falsch', icons: [] }),
+      { headers: { 'Content-Type': 'application/manifest+json' } }));
+  });
+  const frisch = await page.evaluate(
+    () => fetch('manifest.webmanifest').then(r => r.json()).catch(() => null));
+  ok(frisch && frisch.name === 'CarCollection' && frisch.id === '/CarCollection/app',
+    `Das Manifest kommt vom Netz, nicht aus dem Cache (${frisch && frisch.name})`);
+
   ok(!(await imCache('/README.md')), 'README.md liegt vorher nicht im Cache');
   await page.evaluate(() => fetch('README.md').then(r => r.text()));
   await page.waitForFunction(async () => {

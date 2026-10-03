@@ -526,6 +526,15 @@ Adresse, nicht an der Kennung der App. Fahrzeuge, Dokumente und Bilder bleiben
 unberührt. Umgekehrt gilt: Wer die *Website-Daten* in den Chrome-Einstellungen
 löscht, löscht die Akte — davor sichern.
 
+**Das Manifest kommt deshalb nie aus dem Cache.** Der Service Worker holt es
+wie `version.json` immer vom Netz und greift nur offline auf den Cache zurück.
+Lag es wie jede andere Datei im Cache, erreichte eine Änderung daran — neue
+Kennung, neuer Name, neue Symbole — das Gerät erst Fassungen später oder gar
+nicht. Genau daran scheiterte am 03.10.2026 der erste Versuch, die Kennung zu
+setzen: Sie kam auf dem Pixel nie an. Eine Prüfung in `grundfunktionen` stellt
+den Fall nach, indem sie den Cache-Eintrag mit einem erfundenen Manifest
+überschreibt.
+
 ## Plattform-Unterschiede
 
 Beides ist im Code berücksichtigt:

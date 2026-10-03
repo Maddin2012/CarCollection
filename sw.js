@@ -4,7 +4,7 @@
    WICHTIG: bei jeder Änderung an index.html o. ä. die Fassung hochzählen - hier
    CACHE, dazu APP_VERSION in index.html und version.json. Alle drei müssen
    dieselbe Zahl tragen, die CI vergleicht sie. */
-const CACHE = 'carcollection-v21';
+const CACHE = 'carcollection-v22';
 const ASSETS = [
   './',
   './index.html',
@@ -36,6 +36,27 @@ self.addEventListener('fetch', e => {
   // die App ab.
   if (new URL(req.url).pathname.endsWith('/version.json')) {
     e.respondWith(fetch(req, { cache: 'no-store' }));
+    return;
+  }
+
+  // Das Manifest entscheidet, als welche App der Browser die Seite führt -
+  // Name, Symbole und vor allem die Kennung. Käme es wie jede andere Datei aus
+  // dem Cache, erreichte eine Änderung daran den Browser erst Fassungen später
+  // oder gar nicht. Genau das ist am 03.10.2026 passiert: Eine neu gesetzte
+  // Kennung kam auf dem Gerät nie an. Also Netz zuerst, Cache nur als Rückfall
+  // fürs Offline-Arbeiten.
+  if (new URL(req.url).pathname.endsWith('/manifest.webmanifest')) {
+    e.respondWith(
+      fetch(req, { cache: 'no-store' })
+        .then(res => {
+          if (res && res.ok) {
+            const kopie = res.clone();
+            caches.open(CACHE).then(c => c.put(req, kopie)).catch(() => {});
+          }
+          return res;
+        })
+        .catch(() => caches.match(req))
+    );
     return;
   }
 

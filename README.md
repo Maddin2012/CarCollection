@@ -481,7 +481,7 @@ Einmalig im Repository unter **Settings** zu erledigen:
 1. **Default-Branch** – `General` → `Default branch` → auf `main` umstellen.
 2. **GitHub Pages** – `Pages` → Source `Deploy from a branch`, Branch `main`,
    Ordner `/ (root)`. Nach ein bis zwei Minuten liegt die App unter
-   `https://maddin2012.github.io/CarCollection/`.
+   `https://maddin2012.github.io/Garage/`.
 3. **Ruleset** – `Rules` → `Rulesets` → `New branch ruleset`:
    - Name z. B. `main schützen`, Enforcement status `Active`
    - Target branches → `Include default branch`
@@ -508,23 +508,36 @@ nicht. Also installieren — oder regelmäßig sichern.
 
 ### Die Kennung der App
 
-Das Manifest trägt ein ausdrückliches `"id": "/CarCollection/app"`. Ohne dieses
-Feld leitet Chrome die Kennung aus `start_url` ab — eine spätere Änderung daran
-ließe die installierte App stillschweigend verwaisen.
+Das Manifest trägt ein ausdrückliches `"id": "/Garage/app"`. Ohne dieses Feld
+leitet Chrome die Kennung aus `start_url` ab — eine spätere Änderung daran ließe
+die installierte App stillschweigend verwaisen.
 
-**Dieser Wert darf nie wieder geändert werden.** Chrome hielte die App danach
-für eine andere: Die installierte Fassung bliebe als Waise zurück, und die
-Installation müsste neu erfolgen. Eine Prüfung in `grundfunktionen` nagelt ihn
-deshalb fest.
+**Dieser Wert darf nicht mehr geändert werden.** Chrome hielte die App danach
+für eine andere. Eine Prüfung in `grundfunktionen` nagelt ihn deshalb fest.
 
-Gesetzt wurde er am 03.10.2026 aus genau diesem Grund in umgekehrter Richtung:
-Chrome meldete „Diese App wurde bereits installiert", obwohl unter *Einstellungen
-→ Apps* nichts stand. Eine neue Kennung löst so einen verwaisten Eintrag auf.
+### Warum die App unter `/Garage/` liegt
+
+Bis zum 03.10.2026 lag sie unter `maddin2012.github.io/CarCollection/`. Dort
+meldete Chrome auf dem Pixel „Diese App wurde bereits installiert", obwohl unter
+*Einstellungen → Apps* nichts stand — die App war vorher deinstalliert worden,
+und Chrome hatte es nicht mitbekommen. Installieren ließ sie sich nicht mehr.
+
+Zwei Versuche, das per Kennung zu lösen, sind gescheitert, und das gehört
+festgehalten, damit es niemand ein drittes Mal versucht: Erst kam die Kennung
+wegen des Service-Worker-Caches nicht an (siehe unten); dann kam sie nachweislich
+an, und Chrome blieb trotzdem dabei. **Chrome hielt die App also nicht an der
+Kennung, sondern offenbar am Pfad fest.** Deshalb der Umzug: Das Repository
+heißt seitdem `Garage`, die App liegt unter `/Garage/`, wo Chrome nichts
+Altes gespeichert hat.
+
+Die alte Adresse führt seitdem ins Leere — GitHub leitet Pages-Seiten nach einer
+Umbenennung nicht um.
 
 **Was dabei nicht passiert: Datenverlust.** Der Browserspeicher hängt an der
-Adresse, nicht an der Kennung der App. Fahrzeuge, Dokumente und Bilder bleiben
-unberührt. Umgekehrt gilt: Wer die *Website-Daten* in den Chrome-Einstellungen
-löscht, löscht die Akte — davor sichern.
+Herkunft `maddin2012.github.io`, nicht am Pfad und nicht an der Kennung.
+Fahrzeuge, Dokumente und Bilder kommen mit an die neue Adresse. Umgekehrt gilt:
+Wer die *Website-Daten* in den Chrome-Einstellungen löscht, löscht die Akte —
+davor sichern.
 
 **Das Manifest kommt deshalb nie aus dem Cache.** Der Service Worker holt es
 wie `version.json` immer vom Netz und greift nur offline auf den Cache zurück.

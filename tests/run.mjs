@@ -17,8 +17,9 @@ import * as lesen from './lesen.test.mjs';
 import * as anhaenge from './anhaenge.test.mjs';
 import * as blatt from './blatt.test.mjs';
 import * as kategorien from './kategorien.test.mjs';
+import * as vorspann from './vorspann.test.mjs';
 
-const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera, vollbild, karte, speicher, logteile, lesen, anhaenge, blatt, kategorien];
+const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera, vollbild, karte, speicher, logteile, lesen, anhaenge, blatt, kategorien, vorspann];
 
 const { base, close } = await serve();
 const browser = await launch();

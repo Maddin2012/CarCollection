@@ -81,7 +81,54 @@ export default async function ({ browser, base, ok }) {
   await page.waitForSelector('.head h2');
   await page.waitForTimeout(120);
   ok(await passtInsFenster(), 'Fahrzeugkarte scrollt bei 360 px nicht seitlich');
+
+  // --- Die untere Leiste (Fassung 17) ---
+  // Gemessen wird die Breite des Beschriftungstexts selbst, nicht scrollWidth
+  // des Knopfes: der Text ist zentriert, ein Überlauf ginge nach beiden Seiten
+  // und wäre in scrollWidth nicht zu sehen.
+  const knoepfe = () => page.evaluate(() =>
+    [...document.querySelectorAll('#nav button')].map(b => {
+      const t = [...b.childNodes].find(n => n.nodeType === 3 && n.textContent.trim());
+      const r = document.createRange(); r.selectNode(t);
+      return {
+        k: b.dataset.k, text: t.textContent.trim(),
+        breit: Math.ceil(r.getBoundingClientRect().width), platz: b.clientWidth
+      };
+    }));
+  const leiste = await knoepfe();
+  const texte = leiste.map(b => b.text).join(', ');
+  ok(texte === 'Cars, Scheckheft, Dokumente, Ersatzteile',
+    `Die Leiste heißt Cars, Scheckheft, Dokumente, Ersatzteile (${texte})`);
+  ok(leiste.map(b => b.k).join(',') === 'card,log,doc,part',
+    `Die Kennungen der Reiter sind unverändert (${leiste.map(b => b.k).join(',')})`);
+  for (const b of leiste) {
+    ok(b.breit <= b.platz,
+      `"${b.text}" passt bei 360 px in den Knopf (${b.breit} von ${b.platz} px)`);
+  }
+
   await page.setViewportSize({ width: 1280, height: 720 });
+
+  // Kopfzeile und Leiste stammen seit Fassung 17 aus derselben Quelle. Geprüft
+  // wird die Gleichheit je Reiter - sonst fiele ein Auseinanderdriften der
+  // beiden Texte nicht auf. Einzige Ausnahme: der Karten-Reiter.
+  for (const b of leiste) {
+    await page.click(`[data-a="tab"][data-k="${b.k}"]`);
+    await page.waitForTimeout(80);
+    const titel = await page.textContent('#title');
+    const soll = b.k === 'card' ? 'CarCollection' : b.text;
+    ok(titel === soll, `Kopfzeile im Reiter "${b.text}" lautet "${soll}" (${titel})`);
+  }
+
+  // Umbenannt wurden nur Leiste und Kopfzeile - die Texte in den Ansichten
+  // selbst bleiben, wie sie waren.
+  await page.click('[data-a="tab"][data-k="part"]');
+  await page.waitForTimeout(80);
+  ok((await page.textContent('#view')).includes('Noch keine Teile'),
+    'Im Reiter selbst heißt es weiterhin "Teile"');
+  await page.click('[data-a="tab"][data-k="card"]');
+  await page.waitForSelector('.foot');
+  ok((await page.textContent('.foot')).includes('Teile'),
+    'Die Fußzeile der Karte zählt weiterhin "Teile"');
 
   // --- Logbuch-Eintrag ---
   await page.click('[data-a="tab"][data-k="log"]');

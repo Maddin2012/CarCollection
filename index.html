@@ -233,7 +233,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='16';
+const APP_VERSION='17';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='', backupNote='';
@@ -609,7 +609,12 @@ const ICONS={
   card:'<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M4 13h16M8 17h4"/>',
   log:'<path d="M14.5 6.5a4 4 0 0 0-5 5L4 17l3 3 5.5-5.5a4 4 0 0 0 5-5l-2.5 2.5-2-.5-.5-2z"/>',
   doc:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
-  part:'<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
+  /* Sechskantmutter: Sechseck mit Loch. Ecken links und rechts, flache Ober-
+     und Unterkante; Mittelpunkt 12/12, Umkreisradius 9,2 - so bleibt bei
+     Strichbreite 1,7 an den Spitzen noch Luft zum Rand des 24er Feldes.
+     Bewusst anders gebaut als ICONS.log (Schraubenschlüssel) und ICONS.gear
+     (Zahnkranz), mit denen es sich sonst verwechseln ließe. */
+  part:'<path d="M21.2 12L16.6 20L7.4 20L2.8 12L7.4 4L16.6 4Z"/><circle cx="12" cy="12" r="3.6"/>',
   edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
   close:'<path d="M6 6l12 12M18 6L6 18"/>',
   rot:'<path d="M4 9h11a4.5 4.5 0 0 1 0 9H8"/><path d="M7.5 5.5L4 9l3.5 3.5"/>',
@@ -624,7 +629,14 @@ const ICONS={
       +'L10.0 21.2L9.5 18.1L7.9 17.2L5.0 18.3L3.1 14.9L5.5 12.9L5.5 11.1L3.1 9.1'
       +'L5.0 5.7L7.9 6.8Z"/><circle cx="12" cy="12" r="2.9"/>'
 };
-const TABS=[['card','Karte'],['log','Logbuch'],['doc','Dokumente'],['part','Teile']];
+/* Die Schlüssel card/log/doc/part sind Kennungen und bleiben, wie sie sind -
+   sie stecken in der History (st.tab), in data-k, in ICONS und in den Tests.
+   Geändert werden nur die Beschriftungen. */
+const TABS=[['card','Cars'],['log','Scheckheft'],['doc','Dokumente'],['part','Ersatzteile']];
+/* Kopfzeile und Leiste aus derselben Quelle, damit die Texte nicht
+   auseinanderdriften. Die einzige Ausnahme: der Karten-Reiter trägt oben den
+   Namen der App statt der Reiter-Beschriftung. */
+const TITLES={...Object.fromEntries(TABS),card:'CarCollection'};
 
 /* ---------- Rendering ---------- */
 function render(){
@@ -632,8 +644,7 @@ function render(){
   if(view==='garage') return renderGarage();
   $('#nav').style.display='grid';
   $('#nav').innerHTML=TABS.map(([k,l])=>`<button data-a="tab" data-k="${k}" class="${tab===k?'on':''}"><svg viewBox="0 0 24 24">${ICONS[k]}</svg>${l}</button>`).join('');
-  const titles={card:'CarCollection',log:'Logbuch',doc:'Dokumente',part:'Teile'};
-  $('#title').textContent=titles[tab];
+  $('#title').textContent=TITLES[tab];
   $('#sub').textContent=tab==='card'?'':(S.v.name||'');
   $('#topBtn').innerHTML=tab==='card'
     ?`<button class="btn ghost ico" data-a="editVehicle" aria-label="Fahrzeugdaten bearbeiten"><svg viewBox="0 0 24 24">${ICONS.edit}</svg></button>`

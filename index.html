@@ -233,7 +233,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='17';
+const APP_VERSION='18';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='', backupNote='';
@@ -606,7 +606,13 @@ function fileToData(file,max){
 
 /* ---------- Icons ---------- */
 const ICONS={
-  card:'<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M4 13h16M8 17h4"/>',
+  /* Auto von vorn: Dach und Windschutzscheibe, darunter der Wagenkasten mit
+     den beiden Radkasten-Ecken, dazu zwei Scheinwerfer. Vorher stand hier eine
+     Karteikarte - der Reiter zeigt aber ein Fahrzeug, kein Formular. */
+  card:'<path d="M5.4 12.6l1.9-4.3a2.2 2.2 0 0 1 2-1.3h5.4a2.2 2.2 0 0 1 2 1.3l1.9 4.3"/>'
+      +'<path d="M4.2 12.6h15.6a1.4 1.4 0 0 1 1.4 1.4v2.8a1 1 0 0 1-1 1h-1.6a1 1 0 0 1-1-1'
+      +'v-.8H6.4v.8a1 1 0 0 1-1 1H3.8a1 1 0 0 1-1-1V14a1.4 1.4 0 0 1 1.4-1.4z"/>'
+      +'<path d="M5.4 14.6h1.8M16.8 14.6h1.8"/>',
   log:'<path d="M14.5 6.5a4 4 0 0 0-5 5L4 17l3 3 5.5-5.5a4 4 0 0 0 5-5l-2.5 2.5-2-.5-.5-2z"/>',
   doc:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
   /* Sechskantmutter: Sechseck mit Loch. Ecken links und rechts, flache Ober-

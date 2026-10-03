@@ -25,6 +25,12 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
 
 ## Funktionen
 
+Die untere Leiste führt durch ein geöffnetes Fahrzeug und ist mit
+**Cars**, **Scheckheft**, **Dokumente** und **Ersatzteile** beschriftet; die
+Kopfzeile nennt denselben Namen. Innerhalb der Ansichten stehen weiter die
+Begriffe *Logbuch* und *Teile* — umbenannt sind nur Leiste und Kopfzeile, und
+auch dieser Text bleibt bei den gewachsenen Namen.
+
 - **Garage** – Übersicht aller Fahrzeuge als Karten, mit Warnbanner für
   abgelaufenen oder bald fälligen TÜV.
 - **Fahrzeugkarte** – Titelbild, Kilometerstand, Baujahr, TÜV-Datum, letzter
@@ -410,7 +416,7 @@ die App:
 
 | Reihe | Prüft |
 | --- | --- |
-| `grundfunktionen` | Speicherung in IndexedDB, Überleben von Neuladen und neuem Tab, Manifest, Icons, Service Worker, Offline-Betrieb |
+| `grundfunktionen` | Speicherung in IndexedDB, Überleben von Neuladen und neuem Tab, Manifest, Icons, Service Worker, Offline-Betrieb, Beschriftung der unteren Leiste samt Gleichlauf mit der Kopfzeile |
 | `sicherung` | Export, vollständiges Leeren des Speichers, Wiedereinlesen samt Bildern, Zusammenführen ohne Duplikate, Abweisen fremder Dateien |
 | `plattformen` | beide Plattform-Pfade, indem Safaris Eigenheiten im Chromium nachgestellt werden; dazu Chromes Erlaubnisliste fürs Teilen |
 | `navigation` | Zurück-Geste über Garage, Fahrzeug, Sheets und Vollbild; kein toter History-Eintrag nach dem Schließen |
@@ -421,7 +427,7 @@ die App:
 | `vollbild` | Zoom und Schieben mit selbst erzeugten Zeiger-Ereignissen, Grenzen, Einpassen |
 | `karte` | letzter Service aus Logbuch und Handfeld, Titelbild in der Maske, Höhe des Bildbereichs |
 | `speicher` | gestellte Lesefehler verlieren keine Daten, Datenrettung in beiden Speichern, ehrliche Speicheranzeige, Sicherungsmahnung |
-| `logteile` | Leseblatt ohne Eingabefelder, Teile anlegen und verknüpfen, die Kostenregel mit zwei Zahlen nachgerechnet |
+| `logteile` | Leseblatt ohne Eingabefelder, Teile anlegen und verknüpfen, die Kostenregel mit zwei Zahlen nachgerechnet, Zahnrad und Sechskantmutter als eigene Pfade |
 | `lesen` | Dokument und Teil nur ansehen, Ändern über den Stift, Bilddatei am Speicher geprüft |
 | `anhaenge` | Bild und Dokument am Eintrag und am Teil, Kategorien getrennt, Abbrechen am Speicher geprüft |
 

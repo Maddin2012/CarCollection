@@ -236,10 +236,19 @@ export default async function ({ browser, base, ok }) {
   // --- Das Zahnrad ---
   await page.goBack();
   await page.waitForSelector('.grid, .mini');
-  const pfade = await page.evaluate(() => ({ gear: ICONS.gear, part: ICONS.part }));
-  ok(pfade.gear !== pfade.part, 'Zahnrad und Teile-Symbol sind nicht derselbe Pfad');
+  const pfade = await page.evaluate(() => ({ gear: ICONS.gear, part: ICONS.part, log: ICONS.log }));
+  ok(pfade.gear !== pfade.part, 'Zahnrad und Ersatzteil-Symbol sind nicht derselbe Pfad');
+  ok(pfade.part !== pfade.log, 'Ersatzteil-Symbol und Logbuch-Symbol sind nicht derselbe Pfad');
   ok(pfade.gear.includes('<path') && !pfade.gear.includes('M12 3v3'),
-    'Das Zahnrad ist kein Kranz aus Strahlen wie das Teile-Symbol');
+    'Das Zahnrad ist kein Kranz aus Strahlen');
+  // Seit Fassung 17 ist das Ersatzteil-Symbol eine Sechskantmutter: ein
+  // geschlossener Sechseckpfad mit Loch, kein Kreis mit Strahlen mehr.
+  ok(!pfade.part.includes('M12 3v3'),
+    'Das Ersatzteil-Symbol ist kein Kreis mit Strahlen mehr');
+  ok(/Z"\s*\/>/.test(pfade.part) && pfade.part.includes('<circle'),
+    'Das Ersatzteil-Symbol ist ein geschlossenes Vieleck mit Loch');
+  ok((pfade.part.match(/L/g) || []).length === 5,
+    `Das Vieleck hat sechs Ecken (${(pfade.part.match(/L/g) || []).length + 1})`);
   ok(await frei(page, '#topBtn [data-a="settings"]'),
     'Der Knopf oben rechts ist da und zu treffen');
 

@@ -52,6 +52,10 @@ auch dieser Text bleibt bei den gewachsenen Namen.
   direkt am Teil anhängen.
 - **TÜV-Erinnerung** – Export eines `.ics`-Termins mit Erinnerungen 30 und
   7 Tage vor Ablauf.
+- **Blatt wegziehen** – jedes Blatt lässt sich am Griff oben oder an der
+  Titelzeile nach unten wegziehen; ab etwa 90 px oder einem kurzen Schlenker
+  geht es zu, sonst federt es zurück. Das wirkt wie *Abbrechen*: getippte Werte
+  verfallen. Im Blattinneren und auf dem Knopf in der Ecke beginnt kein Zug.
 - **Zurück-Geste** – die Zurück-Geste des Handys geht einen Schritt zurück,
   statt die App zu schließen: offenes Sheet oder Vollbild zu, sonst zurück in
   die Garage. Der zuletzt gezeigte Reiter übersteht ein Neuladen.
@@ -431,6 +435,7 @@ die App:
 | `logteile` | Leseblatt ohne Eingabefelder, Teile anlegen und verknüpfen, die Kostenregel mit zwei Zahlen nachgerechnet, Zahnrad und Sechskantmutter als eigene Pfade |
 | `lesen` | Dokument und Teil nur ansehen, Ändern über den Stift, Bilddatei am Speicher geprüft |
 | `anhaenge` | Bild und Dokument am Eintrag und am Teil, Kategorien getrennt, Abbrechen am Speicher geprüft |
+| `blatt` | Blatt wegziehen mit selbst erzeugten Zeiger-Ereignissen: Schwelle, Zurückfedern, wo der Zug beginnen darf, und dass danach kein toter History-Eintrag bleibt |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter

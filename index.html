@@ -159,6 +159,12 @@ input,select,textarea{width:100%;background:var(--bg);color:var(--text);border:1
 textarea{min-height:64px;resize:vertical}
 input.upper{text-transform:uppercase}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* Zwei Eingabefelder nebeneinander. field() und select() liefern Beschriftung
+   und Feld als Geschwister - im einfachen Raster stünde die Beschriftung neben
+   dem eigenen Feld und die Zeilen säßen versetzt. Spaltenweise gefüllt steht
+   jede Beschriftung über ihrem Feld (Fassung 26). */
+.two.paar{grid-auto-flow:column;grid-template-rows:auto auto;row-gap:0}
+.two.paar>input,.two.paar>select{min-width:0}
 .row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
 .err{color:var(--danger);font-size:13px;margin-top:10px;min-height:0}
 .viewer img{width:100%;border-radius:12px;background:var(--bg)}
@@ -246,7 +252,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='25';
+const APP_VERSION='26';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='', backupNote='';
@@ -1826,15 +1832,15 @@ function vehicleSheet(isNew){
   openSheet(isNew?'Neues Fahrzeug':'Fahrzeugdaten',
     field('Marke und Modell','name',v.name,'text','placeholder="z. B. VW Golf"')+
     field('Variante','variant',v.variant,'text','placeholder="z. B. GTI Edition 35"')+
-    `<div class="two">${field('Kennzeichen','plate',v.plate)}${field('Baujahr','year',v.year,'number','inputmode="numeric"')}</div>`+
-    `<div class="two">${field('Leistung (PS)','power',v.power,'number','inputmode="numeric"')}${field('Hubraum (cm³)','displacement',v.displacement,'number','inputmode="numeric"')}</div>`+
-    `<div class="two">${field('Kraftstoff','fuel',v.fuel,'text','placeholder="Benzin, Diesel …"')}${field('Kilometerstand','km',v.km||'','number','inputmode="numeric"')}</div>`+
+    `<div class="two paar">${field('Kennzeichen','plate',v.plate)}${field('Baujahr','year',v.year,'number','inputmode="numeric"')}</div>`+
+    `<div class="two paar">${field('Leistung (PS)','power',v.power,'number','inputmode="numeric"')}${field('Hubraum (cm³)','displacement',v.displacement,'number','inputmode="numeric"')}</div>`+
+    `<div class="two paar">${field('Kraftstoff','fuel',v.fuel,'text','placeholder="Benzin, Diesel …"')}${field('Kilometerstand','km',v.km||'','number','inputmode="numeric"')}</div>`+
     (nativeMonth
-      ?`<div class="two">${field('TÜV gültig bis','tuev',v.tuev,'month')}${field('FIN (optional)','vin',v.vin)}</div>`
+      ?`<div class="two paar">${field('TÜV gültig bis','tuev',v.tuev,'month')}${field('FIN (optional)','vin',v.vin)}</div>`
       :monthField('TÜV gültig bis','tuev',v.tuev)+field('FIN (optional)','vin',v.vin))+
     // Schlüsselnummern aus der Zulassungsbescheinigung Teil I
-    `<div class="two">${field('HSN (zu 2.1)','hsn',v.hsn,'text','inputmode="numeric" maxlength="4" placeholder="4 Ziffern"')}${field('TSN (zu 2.2)','tsn',v.tsn,'text','maxlength="3" class="upper" placeholder="3 Zeichen"')}</div>`+
-    `<div class="two">${field('Letzter Service','service',v.service,'date')}${field('km beim Service','serviceKm',v.serviceKm||'','number','inputmode="numeric"')}</div>
+    `<div class="two paar">${field('HSN (zu 2.1)','hsn',v.hsn,'text','inputmode="numeric" maxlength="4" placeholder="4 Ziffern"')}${field('TSN (zu 2.2)','tsn',v.tsn,'text','maxlength="3" class="upper" placeholder="3 Zeichen"')}</div>`+
+    `<div class="two paar">${field('Letzter Service','service',v.service,'date')}${field('km beim Service','serviceKm',v.serviceKm||'','number','inputmode="numeric"')}</div>
      <p class="dhint">Leer lassen, wenn der Service im Logbuch als Wartung steht – die Karte nimmt ihn von dort. Ein Datum hier ist für einen Service aus der Zeit vor der App; angezeigt wird immer das jüngere von beidem.</p>`+
     `<label>Titelbild</label>
      <div class="cbox" id="cbox"></div>
@@ -2000,8 +2006,8 @@ const A={
     const logId=l.id||uid();
     openSheet(isNew?'Neuer Eintrag':'Eintrag bearbeiten',
       field('Titel','title',l.title,'text','placeholder="z. B. Zahnriemen gewechselt"')+
-      `<div class="two">${select('Art','type',LOGTYPES,l.type)}${select('Kategorie','category',PARTCATS,l.category)}</div>`+
-      `<div class="two">${field('Datum','date',l.date,'date')}${field('Kilometerstand','km',l.km||'','number','inputmode="numeric"')}</div>`+
+      `<div class="two paar">${select('Art','type',LOGTYPES,l.type)}${select('Kategorie','category',PARTCATS,l.category)}</div>`+
+      `<div class="two paar">${field('Datum','date',l.date,'date')}${field('Kilometerstand','km',l.km||'','number','inputmode="numeric"')}</div>`+
       field('Kosten (€)','cost',l.cost||'','number','inputmode="decimal" step="0.01"')+
       `<label>Notiz</label><textarea name="note">${esc(l.note)}</textarea>`+
       // Das Teile-Formular steht in data-nebenform: Seine Felder gehören nicht
@@ -2009,8 +2015,8 @@ const A={
       `<label>Teile</label>
        <div class="dlist" id="logParts"></div>
        <div data-nebenform id="logPartForm">
-         <div class="two">${field('Bezeichnung','pName','','text','placeholder="z. B. Zahnriemensatz"')}${select('Kategorie','pCat',PARTCATS,l.category)}</div>
-         <div class="two">${field('Preis (€)','pPrice','','number','inputmode="decimal" step="0.01"')}${field('Teilenummer','pNo')}</div>
+         <div class="two paar">${field('Bezeichnung','pName','','text','placeholder="z. B. Zahnriemensatz"')}${select('Kategorie','pCat',PARTCATS,l.category)}</div>
+         <div class="two paar">${field('Preis (€)','pPrice','','number','inputmode="decimal" step="0.01"')}${field('Teilenummer','pNo')}</div>
          <div class="actions"><button class="btn wide" data-a="logPartNeu">Teil hinzufügen</button></div>
          <label>Oder ein vorhandenes Teil verknüpfen</label>
          <div class="two"><select name="pPick" id="logPartPick"></select><button class="btn" data-a="logPartAn">Verknüpfen</button></div>
@@ -2123,9 +2129,9 @@ const A={
     const partId=p.id||uid();
     openSheet(isNew?'Neues Teil':'Teil bearbeiten',
       field('Bezeichnung','name',p.name,'text','placeholder="z. B. Sportluftfilter"')+
-      `<div class="two">${select('Kategorie','category',PARTCATS,p.category)}${select('Status','status',STATUS,p.status)}</div>`+
-      `<div class="two">${field('Preis (€)','price',p.price||'','number','inputmode="decimal" step="0.01"')}${field('Kaufdatum','date',p.date,'date')}</div>`+
-      `<div class="two">${field('Händler','vendor',p.vendor)}${field('Teilenummer','partno',p.partno)}</div>`+
+      `<div class="two paar">${select('Kategorie','category',PARTCATS,p.category)}${select('Status','status',STATUS,p.status)}</div>`+
+      `<div class="two paar">${field('Preis (€)','price',p.price||'','number','inputmode="decimal" step="0.01"')}${field('Kaufdatum','date',p.date,'date')}</div>`+
+      `<div class="two paar">${field('Händler','vendor',p.vendor)}${field('Teilenummer','partno',p.partno)}</div>`+
       `<label>Notiz</label><textarea name="note">${esc(p.note)}</textarea>`+
       anhangFeld('Angehängte Dokumente und Bilder stehen auch im Reiter Dokumente – sie liegen dort und nicht doppelt, Bilder unter der Kategorie Fotos. Das × löst sie nur von diesem Teil; gelöscht werden sie im Reiter Dokumente.'),
       async()=>{
@@ -2151,7 +2157,7 @@ const A={
        <input type="file" id="fCam" accept="image/*" capture="environment" hidden>
        <input type="file" id="fPick" accept="image/*,application/pdf" hidden>`+
       field('Titel','title','','text','placeholder="z. B. TÜV-Gutachten 2026"')+
-      `<div class="two">${select('Kategorie','category',DOCCATS,'Fahrzeugpapiere')}${field('Datum','date',today(),'date')}</div>`,
+      `<div class="two paar">${select('Kategorie','category',DOCCATS,'Fahrzeugpapiere')}${field('Datum','date',today(),'date')}</div>`,
       async()=>{
         const o=vals(); if(!pending) return showErr('Bitte zuerst ein Dokument scannen oder auswählen.');
         if(!o.title) return showErr('Bitte einen Titel eintragen.');
@@ -2203,7 +2209,7 @@ const A={
     if(!$('#full').hidden) replaceModalWith();
     openSheet('Dokument bearbeiten',
       field('Titel','title',doc.title,'text','placeholder="z. B. TÜV-Gutachten 2026"')+
-      `<div class="two">${select('Kategorie','category',DOCCATS,doc.category)}${field('Datum','date',doc.date||'','date')}</div>`+
+      `<div class="two paar">${select('Kategorie','category',DOCCATS,doc.category)}${field('Datum','date',doc.date||'','date')}</div>`+
       `<label>Notiz</label><textarea name="note">${esc(doc.note)}</textarea>`+
       `<p class="dhint">Die Aufnahme selbst bleibt, wie sie ist. Soll ein anderes Bild hinein, lege das Dokument neu an.</p>`,
       async()=>{

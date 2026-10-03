@@ -187,7 +187,7 @@ export default async function ({ browser, base, ok }) {
   // Änderung daran würde die installierte App stillschweigend verwaisen
   // lassen. Der Wert ist hier festgenagelt, weil ein Ändern genau das
   // auslöst: Chrome hielte sie für eine andere App.
-  ok(manifest && manifest.id === '/Garage/app',
+  ok(manifest && manifest.id === '/CarCollection/app',
     `Das Manifest trägt eine ausdrückliche Kennung (${manifest && manifest.id})`);
   ok(await page.evaluate(() => navigator.serviceWorker.getRegistration().then(r => !!r)), 'Service Worker registriert');
   for (const i of ['icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png']) {
@@ -270,7 +270,7 @@ export default async function ({ browser, base, ok }) {
   });
   const frisch = await page.evaluate(
     () => fetch('manifest.webmanifest').then(r => r.json()).catch(() => null));
-  ok(frisch && frisch.name === 'CarCollection' && frisch.id === '/Garage/app',
+  ok(frisch && frisch.name === 'CarCollection' && frisch.id === '/CarCollection/app',
     `Das Manifest kommt vom Netz, nicht aus dem Cache (${frisch && frisch.name})`);
 
   ok(!(await imCache('/README.md')), 'README.md liegt vorher nicht im Cache');

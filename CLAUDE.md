@@ -23,7 +23,7 @@ Styles und die gesamte Logik. Kein Build, keine Abhängigkeiten, kein Server.
 Beschreibung der Funktionen und der Einrichtung steht in `README.md`.
 
 Die App wird über GitHub Pages aus `main` ausgeliefert:
-`https://maddin2012.github.io/Garage/`
+`https://maddin2012.github.io/CarCollection/`
 
 ## Feste Punkte
 

@@ -147,7 +147,7 @@ export default async function ({ browser, base, ok }) {
     ok((await page.locator('#sheet.open').count()) === 1, 'Die Logbuch-Maske steht noch');
     ok((await page.inputValue('[name="title"]')) === 'Bremsen erneuert',
       'Die getippten Werte sind unverändert');
-    ok((await page.locator('#logDocs .d').count()) === 0, 'Abbrechen hängt nichts an');
+    ok((await page.locator('#anhaenge .d').count()) === 0, 'Abbrechen hängt nichts an');
 
     // --- Und die Zurück-Geste tut dasselbe ---
     await page.click('[data-a="pickCam"]');
@@ -169,8 +169,8 @@ export default async function ({ browser, base, ok }) {
     await page.click('[data-a="editUeber"]');
     await page.waitForSelector('[data-a="editSpeichern"]');
     await page.click('[data-a="editSpeichern"]');
-    await page.waitForSelector('#logDocs .d');
-    ok((await page.locator('#logDocs .d').count()) === 1,
+    await page.waitForSelector('#anhaenge .d');
+    ok((await page.locator('#anhaenge .d').count()) === 1,
       'Die Aufnahme landet in der Anhangliste des Logbuch-Eintrags');
     await page.click('[data-a="ok"]');
     await page.waitForFunction(() => !document.getElementById('sheet').classList.contains('open'));

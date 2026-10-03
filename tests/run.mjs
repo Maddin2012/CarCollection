@@ -14,8 +14,9 @@ import * as karte from './karte.test.mjs';
 import * as speicher from './speicher.test.mjs';
 import * as logteile from './logteile.test.mjs';
 import * as lesen from './lesen.test.mjs';
+import * as anhaenge from './anhaenge.test.mjs';
 
-const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera, vollbild, karte, speicher, logteile, lesen];
+const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera, vollbild, karte, speicher, logteile, lesen, anhaenge];
 
 const { base, close } = await serve();
 const browser = await launch();

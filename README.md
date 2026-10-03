@@ -32,8 +32,8 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
   (Leistung, Hubraum, Kraftstoff) bleiben in der Bearbeiten-Maske erfassbar.
 - **Logbuch** – Reparaturen, Wartungen und Umbauten mit Datum, Kilometerstand,
   Kategorie und Kosten. Ein Eintrag öffnet zum Lesen, bearbeitet wird über den
-  Stift in der Ecke. Belege und Ersatzteile lassen sich direkt am Eintrag
-  anhängen; die Teile erscheinen dann auch im Reiter Teile.
+  Stift in der Ecke. Belege, Bilder und Ersatzteile lassen sich direkt am
+  Eintrag anhängen; die Teile erscheinen dann auch im Reiter Teile.
 - **Dokumente** – Fahrzeugpapiere, TÜV-Berichte, Versicherung und Rechnungen als
   Foto oder PDF, nach Kategorie gruppiert. Aufgenommen wird mit der Kamera in
   der App; vor dem Speichern lässt sich zuschneiden, geraderücken, drehen und
@@ -41,7 +41,8 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
   Fingern vergrößern.
 - **Teile** – gekaufte Teile mit Kategorie, Status (verbaut / auf Lager /
   bestellt), Preis, Händler und Teilenummer. Ein Teil öffnet zum Lesen,
-  bearbeitet wird über den Stift in der Ecke.
+  bearbeitet wird über den Stift in der Ecke. Dokumente und Bilder lassen sich
+  direkt am Teil anhängen.
 - **TÜV-Erinnerung** – Export eines `.ics`-Termins mit Erinnerungen 30 und
   7 Tage vor Ablauf.
 - **Zurück-Geste** – die Zurück-Geste des Handys geht einen Schritt zurück,
@@ -210,6 +211,38 @@ also dort mit ein, sonst fehlt er in der Summe. Verliert ein Teil den Bezug
 Die Summe im Reiter **Teile** ist davon unberührt: Sie ist die Summe der dort
 angezeigten Teile. Stehen verknüpfte darunter, sagt ein Satz unter der Summe,
 warum die beiden Zahlen nicht dasselbe zählen.
+
+## Dokumente und Bilder anhängen
+
+Am **Logbuch-Eintrag** und am **Teil** gibt es denselben Bereich mit zwei
+Zeilen:
+
+| | |
+| --- | --- |
+| **Dokumente** | *Scannen* · *Datei wählen* |
+| **Bilder** | *Foto aufnehmen* · *Bild wählen* |
+
+Beides geht durch denselben Zuschnitt — Ecken ziehen, drehen, Dokument-Modus
+(der ist standardmäßig aus). Wer nichts ändern will, tippt zweimal weiter.
+Unterschiedlich ist allein, **wie der Anhang einsortiert wird**: Ein Dokument
+landet unter *Rechnungen*, ein Bild unter der Kategorie **Fotos**.
+
+Bei *Bild wählen* lässt die Dateiauswahl nur Bilder zu; bei *Datei wählen* auch
+PDFs.
+
+**Ein Bild ist technisch ein Dokument.** Es liegt in derselben Liste, trägt nur
+eine andere Kategorie. Daraus folgt zweierlei: Es erscheint auch im Reiter
+Dokumente — dort nach Kategorie gruppiert, also säuberlich getrennt von den
+Papieren —, und Sicherung, Wiederherstellung, Löschen und Datenrettung mussten
+dafür nichts dazulernen. Ein zweiter Bildspeicher hätte alle vier zusätzlich
+bedienen müssen.
+
+In der Liste am Eintrag beziehungsweise am Teil steht je Zeile, was es ist:
+**DOK**, **FOTO** oder **PDF**.
+
+Das **×** löst einen Anhang nur vom Eintrag oder Teil. Löschst du einen
+**Logbuch-Eintrag** oder ein **Teil**, bleiben seine Anhänge erhalten und
+verlieren nur den Bezug.
 
 ## Belege am Logbuch-Eintrag
 
@@ -390,6 +423,7 @@ die App:
 | `speicher` | gestellte Lesefehler verlieren keine Daten, Datenrettung in beiden Speichern, ehrliche Speicheranzeige, Sicherungsmahnung |
 | `logteile` | Leseblatt ohne Eingabefelder, Teile anlegen und verknüpfen, die Kostenregel mit zwei Zahlen nachgerechnet |
 | `lesen` | Dokument und Teil nur ansehen, Ändern über den Stift, Bilddatei am Speicher geprüft |
+| `anhaenge` | Bild und Dokument am Eintrag und am Teil, Kategorien getrennt, Abbrechen am Speicher geprüft |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter

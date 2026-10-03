@@ -188,6 +188,54 @@ export default async function ({ browser, base, ok }) {
     ok(await page.evaluate(u => fetch(u).then(r => r.status), i) === 200, `Icon erreichbar: ${i}`);
   }
 
+  // --- Die Symbole selbst ---
+  // Erreichbar heißt nicht brauchbar. Geprüft werden die Maße und - bei den
+  // beiden Manifest-Symbolen - der sichere Bereich: Android legt über ein
+  // maskierbares Symbol eine eigene Form und schneidet bis zu 20 % je Rand
+  // weg. Was außerhalb des Kreises mit 40 % der Kantenlänge liegt, kann
+  // verschwinden; ohne diese Prüfung merkt man das erst auf dem Homescreen.
+  const symbol = (datei, soll) => page.evaluate(async ({ datei, soll }) => {
+    const bild = new Image();
+    await new Promise((fertig, schief) => {
+      bild.onload = fertig; bild.onerror = schief; bild.src = datei;
+    });
+    const c = document.createElement('canvas');
+    c.width = bild.width; c.height = bild.height;
+    const x = c.getContext('2d');
+    x.drawImage(bild, 0, 0);
+    const p = x.getImageData(0, 0, c.width, c.height).data;
+    // Hintergrundfarbe aus der Ecke lesen, statt sie anzunehmen.
+    const grund = [p[0], p[1], p[2]];
+    const gleich = i => Math.abs(p[i] - grund[0]) < 12
+      && Math.abs(p[i + 1] - grund[1]) < 12 && Math.abs(p[i + 2] - grund[2]) < 12;
+    const m = c.width / 2, r = c.width * 0.4;
+    let draussen = 0, drinnen = 0;
+    for (let y = 0; y < c.height; y++) for (let xx = 0; xx < c.width; xx++) {
+      const i = (y * c.width + xx) * 4;
+      if (gleich(i)) continue;
+      ((xx - m) ** 2 + (y - m) ** 2 > r * r) ? draussen++ : drinnen++;
+    }
+    return { breite: bild.width, hoehe: bild.height, draussen, drinnen, soll };
+  }, { datei, soll });
+
+  for (const [datei, soll, maskiert] of [
+    ['icons/icon-192.png', 192, true],
+    ['icons/icon-512.png', 512, true],
+    ['icons/apple-touch-icon.png', 180, false]
+  ]) {
+    const s = await symbol(datei, soll);
+    ok(s.breite === soll && s.hoehe === soll,
+      `${datei} misst ${soll}×${soll} (${s.breite}×${s.hoehe})`);
+    // Nicht leer: Sonst wäre die Prüfung auf den sicheren Bereich auch für
+    // eine reine Hintergrundfläche grün.
+    ok(s.drinnen > soll * soll * 0.01,
+      `${datei} trägt ein Zeichen (${s.drinnen} Punkte)`);
+    if (maskiert) {
+      ok(s.draussen === 0,
+        `${datei} bleibt im sicheren Bereich (${s.draussen} Punkte außerhalb)`);
+    }
+  }
+
   // --- Der Service Worker legt auch nicht vorab gespeicherte Dateien ab ---
   // Das clone() lag einmal einen Mikrotask zu spät: Die Seite hatte den Körper
   // dann schon gelesen, das Klonen warf einen TypeError und es landete nie

@@ -421,7 +421,7 @@ die App:
 
 | Reihe | Prüft |
 | --- | --- |
-| `grundfunktionen` | Speicherung in IndexedDB, Überleben von Neuladen und neuem Tab, Manifest, Icons, Service Worker, Offline-Betrieb, Beschriftung der unteren Leiste samt Gleichlauf mit der Kopfzeile, vier eigene Reiter-Symbole |
+| `grundfunktionen` | Speicherung in IndexedDB, Überleben von Neuladen und neuem Tab, Manifest, Icons, Service Worker, Offline-Betrieb, Beschriftung der unteren Leiste samt Gleichlauf mit der Kopfzeile, vier eigene Reiter-Symbole, Maße der App-Icons und ihr sicherer Bereich unter der Android-Maske |
 | `sicherung` | Export, vollständiges Leeren des Speichers, Wiedereinlesen samt Bildern, Zusammenführen ohne Duplikate, Abweisen fremder Dateien |
 | `plattformen` | beide Plattform-Pfade, indem Safaris Eigenheiten im Chromium nachgestellt werden; dazu Chromes Erlaubnisliste fürs Teilen |
 | `navigation` | Zurück-Geste über Garage, Fahrzeug, Sheets und Vollbild; kein toter History-Eintrag nach dem Schließen |
@@ -462,7 +462,7 @@ python3 -m http.server 8765
 | `manifest.webmanifest` | Name, Farben und Icons der installierbaren App |
 | `sw.js` | Service Worker für den Offline-Betrieb |
 | `version.json` | die ausgelieferte Fassung, für die Update-Prüfung |
-| `icons/` | App-Icons (192, 512 und Apple-Touch-Icon) |
+| `icons/` | App-Icons (192, 512 und Apple-Touch-Icon) – die Bildmarke des Logos, vom Hintergrund befreit und mittig auf `#10151F` gesetzt |
 | `tests/` | Browser-Tests, die die App wirklich bedienen |
 | `.github/workflows/checks.yml` | prüft bei jedem Pull Request Syntax, Dateien und Verhalten |
 

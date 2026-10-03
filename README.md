@@ -506,6 +506,26 @@ sondern Pflicht: Safari räumt den Speicher einer nur im Browser besuchten Seite
 nach sieben Tagen ohne Besuch ab. Für Web-Apps auf dem Home-Bildschirm gilt das
 nicht. Also installieren — oder regelmäßig sichern.
 
+### Die Kennung der App
+
+Das Manifest trägt ein ausdrückliches `"id": "/CarCollection/app"`. Ohne dieses
+Feld leitet Chrome die Kennung aus `start_url` ab — eine spätere Änderung daran
+ließe die installierte App stillschweigend verwaisen.
+
+**Dieser Wert darf nie wieder geändert werden.** Chrome hielte die App danach
+für eine andere: Die installierte Fassung bliebe als Waise zurück, und die
+Installation müsste neu erfolgen. Eine Prüfung in `grundfunktionen` nagelt ihn
+deshalb fest.
+
+Gesetzt wurde er am 03.10.2026 aus genau diesem Grund in umgekehrter Richtung:
+Chrome meldete „Diese App wurde bereits installiert", obwohl unter *Einstellungen
+→ Apps* nichts stand. Eine neue Kennung löst so einen verwaisten Eintrag auf.
+
+**Was dabei nicht passiert: Datenverlust.** Der Browserspeicher hängt an der
+Adresse, nicht an der Kennung der App. Fahrzeuge, Dokumente und Bilder bleiben
+unberührt. Umgekehrt gilt: Wer die *Website-Daten* in den Chrome-Einstellungen
+löscht, löscht die Akte — davor sichern.
+
 ## Plattform-Unterschiede
 
 Beides ist im Code berücksichtigt:

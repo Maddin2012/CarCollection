@@ -95,6 +95,10 @@ button.card{display:block;width:100%;border:0;text-align:left;color:inherit;curs
 .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--muted);padding:6px 13px;border-radius:99px;font-size:13px}
+/* Kategorien eines Scheckheft-Eintrags in der Maske: umbrechen statt seitlich
+   rollen, damit alle elf auf einmal zu sehen sind (Fassung 27). */
+.chips.kats{flex-wrap:wrap;overflow:visible;padding-bottom:4px}
+.chips.kats .chip{padding:8px 14px}
 .chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
 .sum{display:flex;justify-content:space-between;align-items:baseline;padding:4px 2px 12px;color:var(--muted);font-size:13px}
 .sum b{font-family:var(--font);font-size:20px;color:var(--text)}
@@ -245,6 +249,11 @@ input.upper{text-transform:uppercase}
 
 <script>
 const PARTCATS=['Motor','Getriebe','Fahrwerk','Bremsen','Reifen','Felgen','Elektrik','Karosserie','Innenraum','Ersatzteile','Sonstiges'];
+/* Kategorien eines Scheckheft-Eintrags. Seit Fassung 27 eine Liste in
+   `kategorien` - ein großer Service mit Bremsen und Fahrwerk ist ein Eintrag,
+   nicht drei. Ältere Einträge und Sicherungen tragen noch eine einzelne
+   `category`; die gilt weiter, bis der Eintrag gespeichert wird. */
+const logKats=l=>Array.isArray(l.kategorien)?l.kategorien:(l.category?[l.category]:[]);
 const DOCCATS=['Fahrzeugpapiere','TÜV / HU','Versicherung','Rechnungen','Fotos',...PARTCATS];
 const LOGTYPES=['Reparatur','Wartung','Umbau','Sonstiges'];
 const STATUS=['Verbaut','Auf Lager','Bestellt'];
@@ -252,7 +261,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='26';
+const APP_VERSION='27';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='', backupNote='';
@@ -976,7 +985,7 @@ function viewLog(){
     return `
     <button class="item" data-a="openLog" data-id="${l.id}">
       <div class="ico">${esc(l.type.slice(0,3))}</div>
-      <div class="mid"><div class="t">${esc(l.title)}</div><div class="s">${dt(l.date)} · ${esc(l.category)}${l.km?' · '+km(l.km):''}${n?' · '+n+(n===1?' Dokument':' Dokumente'):''}${t?' · '+t+(t===1?' Teil':' Teile'):''}</div></div>
+      <div class="mid"><div class="t">${esc(l.title)}</div><div class="s">${dt(l.date)}${logKats(l).length?' · '+esc(logKats(l).join(', ')):''}${l.km?' · '+km(l.km):''}${n?' · '+n+(n===1?' Dokument':' Dokumente'):''}${t?' · '+t+(t===1?' Teil':' Teile'):''}</div></div>
       <div class="r">${l.cost?eur(l.cost):''}</div>
     </button>`}).join('')
   :`<div class="empty"><b>Noch keine Einträge</b>Halte Reparaturen, Wartungen und Umbauten mit Datum, Kilometerstand und Kosten fest.</div>`);
@@ -1882,6 +1891,8 @@ function vehicleSheet(isNew){
 const A={
   tab:d=>{tab=d.k;syncScreen();render();window.scrollTo(0,0)},
   fLog:d=>{logFilter=d.k;render()},
+  // Eine Kategorie in der Scheckheft-Maske an- oder abwählen.
+  kat:(d,el)=>{const an=el.classList.toggle('on');el.setAttribute('aria-pressed',an)},
   fPart:d=>{partFilter=d.k;render()},
   fDoc:d=>{window._df=d.k;render()},
   close:dismissModal,
@@ -1963,7 +1974,7 @@ const A={
     const dash='–';
     const zeilen=[
       ['Art',esc(l.type||dash)],
-      ['Kategorie',esc(l.category||dash)],
+      [logKats(l).length>1?'Kategorien':'Kategorie',logKats(l).length?esc(logKats(l).join(', ')):dash],
       ['Datum',l.date?dt(l.date):dash],
       ['Kilometerstand',l.km?km(l.km):dash],
       ['Kosten',l.cost?eur(l.cost):dash]
@@ -1999,14 +2010,18 @@ const A={
 
   addLog:()=>A.editLog({}),
   editLog:d=>{
-    const l=S.logs.find(x=>x.id===d.id)||{date:today(),type:'Reparatur',category:'Motor'};
+    const l=S.logs.find(x=>x.id===d.id)||{date:today(),type:'Reparatur',kategorien:[]};
+    // Unbekannte Werte aus älteren Daten bleiben wählbar, statt beim Speichern
+    // still zu verschwinden.
+    const gewaehlt=logKats(l), kats=[...PARTCATS,...gewaehlt.filter(k=>!PARTCATS.includes(k))];
     const isNew=!l.id;
     // Die Kennung steht schon vor dem Speichern fest, damit die Anhänge sich
     // darauf beziehen können. Gespeichert wird sie erst, wenn der Eintrag es wird.
     const logId=l.id||uid();
     openSheet(isNew?'Neuer Eintrag':'Eintrag bearbeiten',
       field('Titel','title',l.title,'text','placeholder="z. B. Zahnriemen gewechselt"')+
-      `<div class="two paar">${select('Art','type',LOGTYPES,l.type)}${select('Kategorie','category',PARTCATS,l.category)}</div>`+
+      select('Art','type',LOGTYPES,l.type)+
+      `<label>Kategorien</label><div class="chips kats" id="logKats" role="group" aria-label="Kategorien">${kats.map(k=>{const an=gewaehlt.includes(k);return `<button type="button" class="chip${an?' on':''}" data-a="kat" data-k="${esc(k)}" aria-pressed="${an}">${esc(k)}</button>`}).join('')}</div>`+
       `<div class="two paar">${field('Datum','date',l.date,'date')}${field('Kilometerstand','km',l.km||'','number','inputmode="numeric"')}</div>`+
       field('Kosten (€)','cost',l.cost||'','number','inputmode="decimal" step="0.01"')+
       `<label>Notiz</label><textarea name="note">${esc(l.note)}</textarea>`+
@@ -2015,7 +2030,7 @@ const A={
       `<label>Teile</label>
        <div class="dlist" id="logParts"></div>
        <div data-nebenform id="logPartForm">
-         <div class="two paar">${field('Bezeichnung','pName','','text','placeholder="z. B. Zahnriemensatz"')}${select('Kategorie','pCat',PARTCATS,l.category)}</div>
+         <div class="two paar">${field('Bezeichnung','pName','','text','placeholder="z. B. Zahnriemensatz"')}${select('Kategorie','pCat',PARTCATS,gewaehlt[0])}</div>
          <div class="two paar">${field('Preis (€)','pPrice','','number','inputmode="decimal" step="0.01"')}${field('Teilenummer','pNo')}</div>
          <div class="actions"><button class="btn wide" data-a="logPartNeu">Teil hinzufügen</button></div>
          <label>Oder ein vorhandenes Teil verknüpfen</label>
@@ -2025,10 +2040,11 @@ const A={
       anhangFeld('Angehängte Dokumente und Bilder stehen auch im Reiter Dokumente – sie liegen dort und nicht doppelt, Bilder unter der Kategorie Fotos. Das × löst sie nur von diesem Eintrag; gelöscht werden sie im Reiter Dokumente.'),
       async()=>{
         const o=vals(); if(!o.title) return showErr('Bitte einen Titel eintragen.');
+        o.kategorien=[...document.querySelectorAll('#logKats .chip.on')].map(b=>b.dataset.k);
         // Erst die Anhänge ablegen: Scheitert das, ist am Eintrag noch nichts
         // geändert.
         if(!await anhaengeAblegen(o.title,o.date)) return;
-        if(isNew) S.logs.push({id:logId,...o}); else Object.assign(l,o);
+        if(isNew) S.logs.push({id:logId,...o}); else { Object.assign(l,o); delete l.category; }
         // Teile: neu angelegte dazu, vorgemerkte verknüpfen, gelöste nur lösen.
         for(const n of logParts.add) S.parts.push({
           id:uid(), logId, name:n.name, category:n.category, status:'Verbaut',

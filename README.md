@@ -38,7 +38,8 @@ auch dieser Text bleibt bei den gewachsenen Namen.
   Service, FIN, HSN und TSN sowie eine Kostenübersicht. Die übrigen Felder
   (Leistung, Hubraum, Kraftstoff) bleiben in der Bearbeiten-Maske erfassbar.
 - **Logbuch** – Reparaturen, Wartungen und Umbauten mit Datum, Kilometerstand,
-  Kategorie und Kosten. Ein Eintrag öffnet zum Lesen, bearbeitet wird über den
+  Kategorien und Kosten. Ein Eintrag kann mehrere Kategorien tragen – ein
+  großer Service mit Arbeiten an Bremsen und Fahrwerk bleibt ein Eintrag. Ein Eintrag öffnet zum Lesen, bearbeitet wird über den
   Stift in der Ecke. Belege, Bilder und Ersatzteile lassen sich direkt am
   Eintrag anhängen; die Teile erscheinen dann auch im Reiter Teile.
 - **Dokumente** – Fahrzeugpapiere, TÜV-Berichte, Versicherung und Rechnungen als
@@ -182,7 +183,7 @@ mehr daran, wie die App gestartet wurde.
 
 ## Logbuch-Eintrag lesen und bearbeiten
 
-Ein Tipp auf einen Eintrag öffnet ihn **zum Lesen**: Art, Kategorie, Datum,
+Ein Tipp auf einen Eintrag öffnet ihn **zum Lesen**: Art, Kategorien, Datum,
 Kilometerstand und Kosten, darunter die Notiz, die angehängten Dokumente und die
 verknüpften Teile. Keine Eingabefelder, nichts, was man versehentlich ändert.
 
@@ -436,6 +437,7 @@ die App:
 | `lesen` | Dokument und Teil nur ansehen, Ändern über den Stift, Bilddatei am Speicher geprüft |
 | `anhaenge` | Bild und Dokument am Eintrag und am Teil, Kategorien getrennt, Abbrechen am Speicher geprüft |
 | `blatt` | Blatt wegziehen mit selbst erzeugten Zeiger-Ereignissen: Schwelle, Zurückfedern, wo der Zug beginnen darf, und dass danach kein toter History-Eintrag bleibt |
+| `kategorien` | Mehrere Kategorien je Scheckheft-Eintrag: An- und Abwählen, Speicher, Liste und Leseblatt, ältere Einträge mit einer einzelnen Kategorie, unbekannte Werte, Sicherung |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter

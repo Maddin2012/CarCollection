@@ -212,7 +212,9 @@ export default async function ({ browser, base, ok }) {
     const p = document.querySelector('#sheet .panel');
     return { ohneKlasse, zeilen, ueberlauf: p.scrollWidth - p.clientWidth };
   });
-  ok(paare.zeilen.length === 4, `Die Scheckheft-Maske hat vier Feldpaare (${paare.zeilen.length})`);
+  // Drei seit Fassung 27: "Art / Kategorie" ist kein Paar mehr, die
+  // Kategorien stehen als eigene Zeile zum Antippen darunter.
+  ok(paare.zeilen.length === 3, `Die Scheckheft-Maske hat drei Feldpaare (${paare.zeilen.length})`);
   ok(paare.ohneKlasse === 0, `Jedes Feldpaar ist als solches gekennzeichnet (${paare.ohneKlasse} ohne)`);
   for (const z of paare.zeilen) {
     ok(z.zwei && z.darueber, `"${z.name}": jede Beschriftung steht über ihrem Feld`);

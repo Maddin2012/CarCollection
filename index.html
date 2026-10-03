@@ -16,8 +16,8 @@
 <style>
 :root{
   --bg:#10151F; --surface:#171E2B; --surface2:#1F2837; --line:#2C3649;
-  --text:#E9EDF5; --muted:#8C97AE; --accent:#6EC6E0; --accent-ink:#08222B;
-  --foil1:#EBDCA9; --foil2:#8C7838; --ok:#6CCB9C; --warn:#E8C25E; --danger:#E5766D;
+  --text:#E9EDF5; --muted:#8C97AE; --accent:#D2B26A; --accent-ink:#241B08;
+  --foil1:#EBDCA9; --foil2:#8C7838; --ok:#6CCB9C; --warn:#F0A04B; --danger:#E5766D;
   --font:"Bahnschrift","DIN Alternate","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
   --body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
 }
@@ -186,7 +186,7 @@ input.upper{text-transform:uppercase}
 .ewrap{position:relative;line-height:0;touch-action:none;max-width:100%;max-height:100%}
 .ewrap canvas,.ewrap video{display:block;max-width:100%;max-height:100%;border-radius:4px;background:#000}
 .ewrap svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
-.ewrap svg polygon{fill:rgba(110,198,224,.14);stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke}
+.ewrap svg polygon{fill:rgba(210,178,106,.14);stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke}
 /* 44 px Grifffläche - kleiner trifft man auf einem Handy nicht zuverlässig. */
 .ecorner{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:transparent;border:0;padding:0;touch-action:none}
 .ecorner::after{content:"";position:absolute;inset:13px;border-radius:50%;background:var(--accent);border:2px solid #0B1018}
@@ -246,7 +246,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='24';
+const APP_VERSION='25';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='', backupNote='';

@@ -144,6 +144,45 @@ export default async function ({ browser, base, ok }) {
   ok((await page.textContent('.foot')).includes('Teile'),
     'Die Fußzeile der Karte zählt weiterhin "Teile"');
 
+  // --- Farben (Fassung 25) ---
+  // Akzent in Gold passend zum App-Symbol, Warnungen in Orange. Gemessen wird
+  // am gezeichneten Element, nicht nur an der Variable - sonst fiele eine
+  // Stelle, die die Variable nicht benutzt, nicht auf.
+  const GOLD = 'rgb(210, 178, 106)', ORANGE = 'rgb(240, 160, 75)';
+  const farben = await page.evaluate(() => {
+    const wurzel = getComputedStyle(document.documentElement);
+    const pille = document.createElement('span');
+    pille.className = 'pill warn'; pille.textContent = 'TÜV';
+    document.body.append(pille);
+    const warn = getComputedStyle(pille).color; pille.remove();
+    return {
+      accent: wurzel.getPropertyValue('--accent').trim().toUpperCase(),
+      warnVar: wurzel.getPropertyValue('--warn').trim().toUpperCase(),
+      reiter: getComputedStyle(document.querySelector('#nav button.on')).color,
+      warn
+    };
+  });
+  ok(farben.accent === '#D2B26A', `Der Akzent ist Symbol-Gold (${farben.accent})`);
+  ok(farben.warnVar === '#F0A04B', `Die Warnfarbe ist Orange (${farben.warnVar})`);
+  ok(farben.reiter === GOLD, `Der aktive Reiter unten ist golden (${farben.reiter})`);
+  // Die Warnfarbe war früher ein Goldgelb. Neben einem goldenen Akzent sähe
+  // eine fällige TÜV-Warnung aus wie ein Knopf - deshalb dieser Vergleich.
+  ok(farben.warn === ORANGE && farben.warn !== farben.reiter,
+    `Eine Warnung ist orange und hebt sich vom Akzent ab (${farben.warn})`);
+  await page.click('[data-a="tab"][data-k="log"]');
+  await page.waitForSelector('[data-a="addLog"]');
+  const knopf = await page.evaluate(() => {
+    const b = document.querySelector('[data-a="addLog"]');
+    return { primaer: b.classList.contains('primary'), hg: getComputedStyle(b).backgroundColor };
+  });
+  ok(knopf.primaer && knopf.hg === GOLD, `Der Hauptknopf ist golden (${knopf.hg})`);
+  // Das Blau stand nicht nur in der Variable, sondern auch fest in der
+  // Füllung beim Ecken-Ziehen im Scan. Es darf nirgends mehr stehen.
+  const quelle = await page.evaluate(() => fetch('index.html', { cache: 'no-store' }).then(r => r.text()));
+  ok(!/6EC6E0|110,\s*198,\s*224/i.test(quelle), 'Im Quelltext steht kein Blau des alten Akzents mehr');
+  await page.click('[data-a="tab"][data-k="card"]');
+  await page.waitForSelector('.foot');
+
   // --- Logbuch-Eintrag ---
   await page.click('[data-a="tab"][data-k="log"]');
   await page.click('[data-a="addLog"]');

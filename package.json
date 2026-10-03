@@ -4,9 +4,13 @@
   "private": true,
   "description": "Fahrzeugakte - Garage, Logbuch, Dokumente und Teile",
   "scripts": {
-    "test": "node tests/run.mjs"
+    "test": "node tests/run.mjs",
+    "karte": "node karte/bau.mjs"
   },
   "devDependencies": {
-    "playwright": "^1.63.0"
+    "jsqr": "^1.4.0",
+    "playwright": "^1.63.0",
+    "pngjs": "^7.0.0",
+    "qrcode": "^1.5.4"
   }
 }

@@ -442,6 +442,7 @@ die App:
 | `blatt` | Blatt wegziehen mit selbst erzeugten Zeiger-Ereignissen: Schwelle, Zurückfedern, wo der Zug beginnen darf, und dass danach kein toter History-Eintrag bleibt |
 | `kategorien` | Mehrere Kategorien je Scheckheft-Eintrag: An- und Abwählen, Speicher, Liste und Leseblatt, ältere Einträge mit einer einzelnen Kategorie, unbekannte Werte, Sicherung |
 | `vorspann` | Vorspann beim Öffnen: steht ab Seitenstart, fängt Tipps ab, verzögert den Start der App nicht, nach 3 Sekunden ganz weg; die übrigen Reihen schalten ihn ab |
+| `installationskarte` | QR-Code der Karte in `karte/` führt auf die Adresse aus `CLAUDE.md`; PDF mit einer Seite; die Verweise der README gehen nicht ins Leere |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter
@@ -500,6 +501,14 @@ Einmalig im Repository unter **Settings** zu erledigen:
 5. **Push protection** – `Advanced Security` → `Push protection` aktivieren.
 
 ## Auf dem Handy installieren
+
+**Installationskarte** zum Weiterschicken oder Ausdrucken: QR-Code, die Schritte
+für Android und iPhone und was im Notfall zu tun ist (neues Handy, Chrome meldet
+„bereits installiert"). Als [Bild](karte/CarCollection-Installieren.png) und als
+[PDF](karte/CarCollection-Installieren.pdf). Wer die Karte bekommt, installiert
+eine eigene, leere Garage – Daten werden nicht geteilt. Ändert sich die Adresse,
+neu bauen mit `npm run karte`; die Reihe `installationskarte` prüft, dass der
+QR-Code auf die Adresse aus `CLAUDE.md` führt.
 
 **Android** (getestet auf Pixel 8 Pro): Pages-URL in Chrome öffnen → Menü →
 *App installieren*. Chrome bietet die Installation meist auch von selbst an.

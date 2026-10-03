@@ -515,31 +515,42 @@ die installierte App stillschweigend verwaisen.
 **Dieser Wert darf nicht mehr geändert werden.** Chrome hielte die App danach
 für eine andere. Eine Prüfung in `grundfunktionen` nagelt ihn deshalb fest.
 
-### Warum die App unter `/Garage/` liegt
+### Wenn Chrome „Diese App wurde bereits installiert" meldet
 
-Bis zum 03.10.2026 lag sie unter `maddin2012.github.io/CarCollection/`. Dort
-meldete Chrome auf dem Pixel „Diese App wurde bereits installiert", obwohl unter
-*Einstellungen → Apps* nichts stand — die App war vorher deinstalliert worden,
-und Chrome hatte es nicht mitbekommen. Installieren ließ sie sich nicht mehr.
+Am 03.10.2026 ließ sich die App auf dem Pixel nicht mehr installieren. Chrome
+bot nur „Verknüpfung erstellen" an und meldete „Diese App wurde bereits
+installiert", obwohl unter *Einstellungen → Apps* nichts stand. Die App war
+vorher deinstalliert worden, und Chrome hatte es nicht mitbekommen.
 
-Zwei Versuche, das per Kennung zu lösen, sind gescheitert, und das gehört
-festgehalten, damit es niemand ein drittes Mal versucht: Erst kam die Kennung
-wegen des Service-Worker-Caches nicht an (siehe unten); dann kam sie nachweislich
-an, und Chrome blieb trotzdem dabei. **Chrome hielt die App also nicht an der
-Kennung, sondern offenbar am Pfad fest.** Deshalb der Umzug: Das Repository
-heißt seitdem `Garage`, die App liegt unter `/Garage/`, wo Chrome nichts
-Altes gespeichert hat.
+**Die Ursache:** ein toter Eintrag in Chrome für die ganze Herkunft
+`maddin2012.github.io`. Erkennbar daran, dass ein Tipp auf „Klicke, um die App
+zu öffnen" mit **„App konnte nicht geöffnet werden"** endet.
 
-Die alte Adresse führt seitdem ins Leere — GitHub leitet Pages-Seiten nach einer
-Umbenennung nicht um.
+**Die Lösung**, in der Chrome-App:
 
-**Was dabei nicht passiert: Datenverlust.** Der Browserspeicher hängt an der
-Herkunft `maddin2012.github.io`, nicht am Pfad und nicht an der Kennung.
-Fahrzeuge, Dokumente und Bilder kommen mit an die neue Adresse. Umgekehrt gilt:
-Wer die *Website-Daten* in den Chrome-Einstellungen löscht, löscht die Akte —
-davor sichern.
+1. In der App **Sicherung speichern** (die Akte geht gleich verloren).
+2. ⋮ → Einstellungen → Website-Einstellungen → Alle Websites →
+   **`maddin2012.github.io`** → *Löschen und zurücksetzen*. Genau dieser
+   Eintrag — nicht `github.com`, der steht direkt daneben.
+3. **Prüfen:** Die Garage muss danach leer sein. Ist sie es nicht, war es der
+   falsche Eintrag.
+4. Chrome schließen, Seite neu laden, ⋮ → *App installieren*, dann in der App
+   *Sicherung einlesen*.
 
-**Das Manifest kommt deshalb nie aus dem Cache.** Der Service Worker holt es
+**Was nicht geholfen hat**, festgehalten, damit es niemand wiederholt: eine neue
+Kennung im Manifest (Fassung 21/22) und der Umzug unter einen neuen Pfad
+(Fassung 23, Repository umbenannt in `Garage`). Beides bleibt trotzdem: Die
+ausdrückliche Kennung ist ohnehin richtig, das Manifest vom Netz zu holen
+ebenfalls (siehe unten), und ein Zurückbenennen würde nur die Adresse erneut
+ändern. Seit dem Umzug liegt die App unter `maddin2012.github.io/Garage/`; die
+alte Adresse `…/CarCollection/` führt ins Leere, GitHub leitet Pages-Seiten nach
+einer Umbenennung nicht um.
+
+**Zum Speicher:** Er hängt an der Herkunft `maddin2012.github.io`, nicht am Pfad
+und nicht an der Kennung. Beim Umzug kamen die Fahrzeuge deshalb mit. Umgekehrt
+löscht Schritt 2 oben die Akte — davor sichern.
+
+**Das Manifest kommt nie aus dem Cache.** Der Service Worker holt es
 wie `version.json` immer vom Netz und greift nur offline auf den Cache zurück.
 Lag es wie jede andere Datei im Cache, erreichte eine Änderung daran — neue
 Kennung, neuer Name, neue Symbole — das Gerät erst Fassungen später oder gar

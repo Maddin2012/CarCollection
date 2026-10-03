@@ -37,6 +37,9 @@ auch dieser Text bleibt bei den gewachsenen Namen.
 - **Fahrzeugkarte** – Titelbild, Kilometerstand, Baujahr, TÜV-Datum, letzter
   Service, FIN, HSN und TSN sowie eine Kostenübersicht. Die übrigen Felder
   (Leistung, Hubraum, Kraftstoff) bleiben in der Bearbeiten-Maske erfassbar.
+- **Vorspann** – beim Öffnen stehen drei Sekunden lang die Bildmarke und der
+  Name auf dunklem Grund. Die App lädt darunter schon; abkürzen lässt er sich
+  bewusst nicht.
 - **Logbuch** – Reparaturen, Wartungen und Umbauten mit Datum, Kilometerstand,
   Kategorien und Kosten. Ein Eintrag kann mehrere Kategorien tragen – ein
   großer Service mit Arbeiten an Bremsen und Fahrwerk bleibt ein Eintrag. Ein Eintrag öffnet zum Lesen, bearbeitet wird über den
@@ -438,6 +441,7 @@ die App:
 | `anhaenge` | Bild und Dokument am Eintrag und am Teil, Kategorien getrennt, Abbrechen am Speicher geprüft |
 | `blatt` | Blatt wegziehen mit selbst erzeugten Zeiger-Ereignissen: Schwelle, Zurückfedern, wo der Zug beginnen darf, und dass danach kein toter History-Eintrag bleibt |
 | `kategorien` | Mehrere Kategorien je Scheckheft-Eintrag: An- und Abwählen, Speicher, Liste und Leseblatt, ältere Einträge mit einer einzelnen Kategorie, unbekannte Werte, Sicherung |
+| `vorspann` | Vorspann beim Öffnen: steht ab Seitenstart, fängt Tipps ab, verzögert den Start der App nicht, nach 3 Sekunden ganz weg; die übrigen Reihen schalten ihn ab |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter

@@ -186,6 +186,41 @@ export default async function ({ browser, base, ok }) {
   // --- Logbuch-Eintrag ---
   await page.click('[data-a="tab"][data-k="log"]');
   await page.click('[data-a="addLog"]');
+
+  // --- Feldpaare in der Maske (Fassung 26) ---
+  // field() und select() liefern Beschriftung und Feld als Geschwister. Im
+  // einfachen zweispaltigen Raster stand deshalb die Beschriftung neben dem
+  // eigenen Feld, und die Zeilen saßen versetzt - auf dem Pixel gemeldet.
+  // Gemessen bei 360 px, der engsten unterstützten Breite.
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.waitForTimeout(80);
+  const paare = await page.evaluate(() => {
+    const r = e => e.getBoundingClientRect();
+    const ohneKlasse = [...document.querySelectorAll('#sbody .two')]
+      .filter(t => t.querySelector(':scope > label') && !t.classList.contains('paar')).length;
+    const zeilen = [...document.querySelectorAll('#sbody .two.paar')].map(t => {
+      const l = [...t.querySelectorAll(':scope > label')], f = [...t.querySelectorAll(':scope > input, :scope > select')];
+      return {
+        name: l.map(x => x.textContent).join(' / '),
+        zwei: l.length === 2 && f.length === 2,
+        // jede Beschriftung über ihrem eigenen Feld, in derselben Spalte
+        darueber: l.every((x, i) => f[i] && r(x).bottom <= r(f[i]).top + 1 && Math.abs(r(x).left - r(f[i]).left) < 2),
+        // beide Spalten auf gleicher Höhe, links vor rechts
+        buendig: f.length === 2 && Math.abs(r(f[0]).top - r(f[1]).top) < 1 && Math.abs(r(l[0]).top - r(l[1]).top) < 1 && r(f[0]).right <= r(f[1]).left
+      };
+    });
+    const p = document.querySelector('#sheet .panel');
+    return { ohneKlasse, zeilen, ueberlauf: p.scrollWidth - p.clientWidth };
+  });
+  ok(paare.zeilen.length === 4, `Die Scheckheft-Maske hat vier Feldpaare (${paare.zeilen.length})`);
+  ok(paare.ohneKlasse === 0, `Jedes Feldpaar ist als solches gekennzeichnet (${paare.ohneKlasse} ohne)`);
+  for (const z of paare.zeilen) {
+    ok(z.zwei && z.darueber, `"${z.name}": jede Beschriftung steht über ihrem Feld`);
+    ok(z.buendig, `"${z.name}": beide Felder auf gleicher Höhe nebeneinander`);
+  }
+  ok(paare.ueberlauf <= 0, `Die Maske läuft bei 360 px nicht seitlich über (${paare.ueberlauf} px)`);
+  await page.setViewportSize({ width: 1280, height: 720 });
+
   await page.fill('[name="title"]', 'Zahnriemen gewechselt');
   await page.fill('[name="cost"]', '780.50');
   await page.click('[data-a="ok"]');

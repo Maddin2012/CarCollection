@@ -243,7 +243,7 @@ export default async function ({ browser, base, ok }) {
   ok((await page.inputValue('[name="title"]')) === 'Bremsen erneuert'
     && (await page.inputValue('[name="cost"]')) === '412.90',
     'Die schon getippten Werte stehen unverändert da');
-  ok((await page.locator('#logDocs .d').count()) === 0, 'Ein abgebrochener Zuschnitt hängt nichts an');
+  ok((await page.locator('#anhaenge .d').count()) === 0, 'Ein abgebrochener Zuschnitt hängt nichts an');
 
   // --- Und ein zweites Zurück schließt das Sheet ---
   await page.goBack();
@@ -271,8 +271,8 @@ export default async function ({ browser, base, ok }) {
   await page.click('[data-a="editUeber"]');
   await page.waitForSelector('[data-a="editSpeichern"]');
   await page.click('[data-a="editSpeichern"]');
-  await page.waitForSelector('#logDocs .d');
-  ok((await page.locator('#logDocs .d').count()) === 1,
+  await page.waitForSelector('#anhaenge .d');
+  ok((await page.locator('#anhaenge .d').count()) === 1,
     'Aus der Logbuch-Maske heraus landet der Scan in der Anhangliste');
   await page.click('[data-a="ok"]');
   await page.waitForFunction(() => !document.getElementById('sheet').classList.contains('open'));

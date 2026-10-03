@@ -41,8 +41,8 @@ export default async function ({ browser, base, ok }) {
   // --- Eintrag mit zwei Dokumenten anlegen ---
   await reiter('log');
   await page.click('[data-a="addLog"]');
-  ok((await page.locator('#logDocs').count()) === 1, 'Die Maske hat einen Bereich für Dokumente');
-  ok((await page.textContent('#logDocs')).includes('Noch nichts angehängt'),
+  ok((await page.locator('#anhaenge').count()) === 1, 'Die Maske hat einen Bereich für Dokumente');
+  ok((await page.textContent('#anhaenge')).includes('Noch nichts angehängt'),
     'Anfangs hängt nichts daran');
 
   await page.fill('[name="title"]', 'Zahnriemen gewechselt');
@@ -50,12 +50,12 @@ export default async function ({ browser, base, ok }) {
   await page.fill('[name="cost"]', '780.50');
   await page.setInputFiles('#fPick', BILD);
   await bildDurchwinken(page);
-  await page.waitForSelector('#logDocs .d');
-  ok((await page.locator('#logDocs .d').count()) === 1, 'Erstes Dokument erscheint in der Liste');
+  await page.waitForSelector('#anhaenge .d');
+  ok((await page.locator('#anhaenge .d').count()) === 1, 'Erstes Dokument erscheint in der Liste');
   await page.setInputFiles('#fPick', BILD2);
   await bildDurchwinken(page);
-  await page.waitForFunction(() => document.querySelectorAll('#logDocs .d').length === 2);
-  ok((await page.locator('#logDocs .d').count()) === 2, 'Mehrere Dokumente sind möglich');
+  await page.waitForFunction(() => document.querySelectorAll('#anhaenge .d').length === 2);
+  ok((await page.locator('#anhaenge .d').count()) === 2, 'Mehrere Dokumente sind möglich');
 
   // --- Vor dem Speichern liegt noch nichts im Bestand ---
   ok((await docs()).length === 0, 'Vor dem Speichern ist noch nichts abgelegt');
@@ -104,27 +104,27 @@ export default async function ({ browser, base, ok }) {
     await page.click('.item[data-a="openLog"]');
     await page.waitForSelector('.shead [data-a="editLog"]');
     await page.click('.shead [data-a="editLog"]');
-    await page.waitForSelector('#logDocs');
+    await page.waitForSelector('#anhaenge');
   };
   await reiter('log');
   await eintragBearbeiten();
-  await page.waitForSelector('#logDocs .d');
-  ok((await page.locator('#logDocs .d').count()) === 2,
+  await page.waitForSelector('#anhaenge .d');
+  ok((await page.locator('#anhaenge .d').count()) === 2,
     'Beim Bearbeiten stehen die angehängten Dokumente in der Maske');
 
   // --- Abbrechen hängt nichts an ---
   await page.setInputFiles('#fPick', BILD);
   await bildDurchwinken(page);
-  await page.waitForFunction(() => document.querySelectorAll('#logDocs .d').length === 3);
+  await page.waitForFunction(() => document.querySelectorAll('#anhaenge .d').length === 3);
   await page.click('.panel .row [data-a="close"]');
   await zu();
   ok((await docs()).length === 2, 'Abbrechen legt das neu Gewählte nicht ab');
 
   // --- Das × löst nur den Bezug, es löscht nicht ---
   await eintragBearbeiten();
-  await page.waitForSelector('#logDocs .d');
-  await page.click('#logDocs .d [data-a="logDocOff"]');
-  await page.waitForFunction(() => document.querySelectorAll('#logDocs .d').length === 1);
+  await page.waitForSelector('#anhaenge .d');
+  await page.click('#anhaenge .d [data-a="anhangOff"]');
+  await page.waitForFunction(() => document.querySelectorAll('#anhaenge .d').length === 1);
   await page.click('[data-a="ok"]');
   await zu();
   const d3 = await docs();
@@ -190,7 +190,7 @@ export default async function ({ browser, base, ok }) {
     await page2.fill('[name="title"]', 'Bremsen erneuert');
     await page2.setInputFiles('#fPick', BILD);
     await bildDurchwinken(page2);
-    await page2.waitForSelector('#logDocs .d');
+    await page2.waitForSelector('#anhaenge .d');
     await page2.click('[data-a="ok"]');
     await page2.waitForFunction(
       () => !document.getElementById('sheet').classList.contains('open'));

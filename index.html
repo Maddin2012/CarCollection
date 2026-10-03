@@ -226,14 +226,14 @@ input.upper{text-transform:uppercase}
 
 <script>
 const PARTCATS=['Motor','Getriebe','Fahrwerk','Bremsen','Reifen','Felgen','Elektrik','Karosserie','Innenraum','Ersatzteile','Sonstiges'];
-const DOCCATS=['Fahrzeugpapiere','TÜV / HU','Versicherung','Rechnungen',...PARTCATS];
+const DOCCATS=['Fahrzeugpapiere','TÜV / HU','Versicherung','Rechnungen','Fotos',...PARTCATS];
 const LOGTYPES=['Reparatur','Wartung','Umbau','Sonstiges'];
 const STATUS=['Verbaut','Auf Lager','Bestellt'];
 
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='15';
+const APP_VERSION='16';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='', backupNote='';
@@ -981,7 +981,7 @@ function viewPart(){
     items.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(p=>`
     <button class="item" data-a="openPart" data-id="${p.id}">
       <div class="ico">${esc(p.status.slice(0,2))}</div>
-      <div class="mid"><div class="t">${esc(p.name)}</div><div class="s">${esc(p.status)}${p.date?' · '+dt(p.date):''}${p.vendor?' · '+esc(p.vendor):''}${partBezug(p)}</div></div>
+      <div class="mid"><div class="t">${esc(p.name)}</div><div class="s">${esc(p.status)}${p.date?' · '+dt(p.date):''}${p.vendor?' · '+esc(p.vendor):''}${partBezug(p)}${(a=>a?' · '+a+(a===1?' Anhang':' Anhänge'):'')(docsOfPart(p.id).length)}</div></div>
       <div class="r">${p.price?eur(p.price):''}${p.partno?`<small>${esc(p.partno)}</small>`:''}</div>
     </button>`).join('');
   }).join('')
@@ -1058,7 +1058,7 @@ function openSheet(title,body,onSave,del,kopf){
   <div class="row">${del?'<button class="btn ghost danger" data-a="del">Löschen</button>':''}<button class="btn ghost" data-a="close">${onSave?'Abbrechen':'Schließen'}</button>${onSave?'<button class="btn primary" data-a="ok">Speichern</button>':''}</div></div>`;
   $('#sheet').classList.add('open');
 }
-const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=pendingDoc=logDocs=logParts=pendingCover=null;};
+const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=pendingDoc=anhaenge=logParts=pendingCover=null;};
 /* Sammelt die Felder der offenen Maske ein. Felder in einem Nebenformular -
    etwa dem für ein neues Teil am Logbuch-Eintrag - bleiben ausdrücklich
    draußen: Sonst klebten sie über Object.assign still am Datensatz und fielen
@@ -1094,26 +1094,41 @@ function bumpKm(k){ k=Number(k); if(k&&k>Number(S.v.km||0)) S.v.km=k; }
    Logbuch-Eintrag ist das Feld logId. Damit gibt es nichts zu synchronisieren -
    der Reiter Dokumente zeigt dieselben Sätze, nur anders sortiert.
 
-   Solange das Sheet offen ist, sammelt logDocs die noch nicht gespeicherten
+   Solange das Sheet offen ist, sammelt anhaenge die noch nicht gespeicherten
    Anhänge. Erst beim Speichern werden sie abgelegt; bricht man ab, bleibt
-   nichts zurück. */
-let logDocs=null;   // {logId, add:[{tmp,data,type,datei}], off:[docId]}
+   nichts zurück.
+
+   Dieselbe Sammelstelle bedient den Logbuch-Eintrag (Feld logId) und das Teil
+   (Feld partId). Zwei fast gleiche Sammelstellen wären auseinandergedriftet,
+   deshalb trägt sie das Feld, auf das sie sich bezieht, bei sich.
+
+   art ist 'dok' oder 'foto' und entscheidet beim Speichern allein über die
+   Kategorie: Ein Bild ist ein Dokument mit der Kategorie "Fotos". Damit müssen
+   Sicherung, Wiederherstellung, Löschen und Datenrettung nichts dazulernen -
+   sie kennen S.docs schon. */
+let anhaenge=null;   // {feld:'logId'|'partId', id, add:[{tmp,data,type,datei,art}], off:[docId]}
+// Welche Art der zuletzt gedrückte Knopf meint. docAufnehmen liest sie erst
+// beim Ablegen aus, weil zwischen Tipp und Ergebnis der Zuschnitt liegt.
+let anhangArt='dok';
 
 const docsOf=id=>S.docs.filter(d=>d.logId===id);
-// Der Bezug zum Logbuch-Eintrag, sofern es ihn noch gibt. Ein verwaister
-// Verweis - etwa nach dem Zusammenführen einer Sicherung - bleibt unerwähnt.
+const docsOfPart=id=>S.docs.filter(d=>d.partId===id);
+// Der Bezug, sofern es ihn noch gibt. Ein verwaister Verweis - etwa nach dem
+// Zusammenführen einer Sicherung - bleibt unerwähnt.
 const docBezug=doc=>{
   const l=doc.logId&&S.logs.find(x=>x.id===doc.logId);
-  return l?' · zu: '+esc(l.title):'';
+  if(l) return ' · zu: '+esc(l.title);
+  const p=doc.partId&&S.parts.find(x=>x.id===doc.partId);
+  return p?' · zu: '+esc(p.name):'';
 };
 
 /* Ein fertiges Dokument in die offene Maske übernehmen - je nachdem, welche
    gerade offen ist. Der Zuschnitt ruft das am Ende auf, PDFs gehen direkt her. */
 function docAufnehmen(r,dateiname){
-  if(logDocs){
-    // Logbuch-Maske: mehrere Anhänge, gespeichert wird erst beim Speichern.
-    logDocs.add.push({tmp:uid(),data:r.data,type:r.type,datei:dateiname});
-    renderLogDocs(); showErr('');
+  if(anhaenge){
+    // Maske mit Anhangbereich: mehrere Anhänge, gespeichert erst beim Speichern.
+    anhaenge.add.push({tmp:uid(),data:r.data,type:r.type,datei:dateiname,art:anhangArt});
+    renderAnhaenge(); showErr('');
   }else{
     pending=r;
     const fn=$('#fname'); if(fn) fn.textContent='Ausgewählt: '+dateiname;
@@ -1175,16 +1190,67 @@ function renderLogParts(){
   }
 }
 
-function renderLogDocs(){
-  const box=$('#logDocs'); if(!box||!logDocs) return;
+/* Kürzel in der Liste: DOK für einen Scan, FOTO für ein Bild, PDF für eine
+   PDF. Vorher stand "BILD" für einen Scan - neben "FOTO" wäre das verwirrend. */
+const anhangKuerzel=(typ,kategorie)=>typ==='pdf'?'PDF':kategorie==='Fotos'?'FOTO':'DOK';
+
+function renderAnhaenge(){
+  const box=$('#anhaenge'); if(!box||!anhaenge) return;
   const zeile=(kuerzel,name,sub,id)=>`<div class="d"><div class="ic">${kuerzel}</div>
     <div class="n">${esc(name)}<small>${esc(sub)}</small></div>
-    <button data-a="logDocOff" data-id="${id}" aria-label="Vom Eintrag lösen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button></div>`;
-  const alte=docsOf(logDocs.logId).filter(d=>!logDocs.off.includes(d.id))
-    .map(d=>zeile(d.type==='pdf'?'PDF':'BILD',d.title,d.category+(d.date?' · '+dt(d.date):''),d.id)).join('');
-  const neue=logDocs.add
-    .map(n=>zeile(n.type==='pdf'?'PDF':'BILD',n.datei,'neu · wird unter dem Titel des Eintrags abgelegt',n.tmp)).join('');
+    <button data-a="anhangOff" data-id="${id}" aria-label="Lösen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button></div>`;
+  const vorhanden=anhaenge.feld==='logId'?docsOf(anhaenge.id):docsOfPart(anhaenge.id);
+  const alte=vorhanden.filter(d=>!anhaenge.off.includes(d.id))
+    .map(d=>zeile(anhangKuerzel(d.type,d.category),d.title,d.category+(d.date?' · '+dt(d.date):''),d.id)).join('');
+  const neue=anhaenge.add
+    .map(n=>zeile(n.type==='pdf'?'PDF':n.art==='foto'?'FOTO':'DOK',n.datei,
+      'neu · '+(n.art==='foto'?'Fotos':'Rechnungen'),n.tmp)).join('');
   box.innerHTML=(alte+neue)||'<p class="dhint">Noch nichts angehängt.</p>';
+}
+
+/* Der Anhangbereich - gleich in der Logbuch- und in der Teile-Maske. Zwei
+   beschriftete Blöcke statt vier Knöpfen in einer Reihe: Bei 360 px Breite
+   wäre eine Viererreihe nicht mehr lesbar. */
+const anhangFeld=hinweis=>`<label>Dokumente</label>
+   <div class="filebox"><button class="btn" data-a="pickCam">Scannen</button><button class="btn" data-a="pickFile">Datei wählen</button></div>
+   <label>Bilder</label>
+   <div class="filebox"><button class="btn" data-a="pickFotoCam">Foto aufnehmen</button><button class="btn" data-a="pickFotoFile">Bild wählen</button></div>
+   <input type="file" id="fCam" accept="image/*" capture="environment" hidden>
+   <input type="file" id="fPick" accept="image/*,application/pdf" hidden>
+   <div class="dlist" id="anhaenge"></div>
+   <p class="dhint">${hinweis}</p>`;
+
+/* Die gesammelten Anhänge ablegen - für die Logbuch- und die Teile-Maske
+   derselbe Weg. Erst die Bilddateien: Scheitert das, ist am Datensatz noch
+   nichts geändert, und was in diesem Durchgang schon geschrieben wurde, räumen
+   wir wieder weg, damit keine verwaisten Bilder zurückbleiben.
+   Liefert false, wenn es nicht geklappt hat; die Meldung steht dann schon. */
+async function anhaengeAblegen(titel,datum){
+  if(!anhaenge) return true;
+  const geschrieben=[];
+  for(const n of anhaenge.add){
+    const did=uid();
+    if(!await store.set('img:'+did,n.data)){
+      for(const w of geschrieben){ await store.del('img:'+w); delete IMG['img:'+w]; }
+      showErr('Ein Anhang ließ sich nicht speichern. Die Datei ist evtl. zu groß.');
+      return false;
+    }
+    IMG['img:'+did]=n.data; n.docId=did; geschrieben.push(did);
+  }
+  // Durchnummeriert wird nur, wenn mehr als ein Anhang dranhängt.
+  const vorhanden=(anhaenge.feld==='logId'?docsOf(anhaenge.id):docsOfPart(anhaenge.id))
+    .filter(x=>!anhaenge.off.includes(x.id)).length;
+  const mehrere=anhaenge.add.length+vorhanden>1;
+  anhaenge.add.forEach((n,i)=>S.docs.push({
+    id:n.docId, type:n.type, [anhaenge.feld]:anhaenge.id,
+    title:titel+(mehrere?' ('+(vorhanden+i+1)+')':''),
+    // Allein die Art entscheidet über die Kategorie - sonst unterscheidet sich
+    // ein Bild in nichts von einem Scan.
+    category:n.art==='foto'?'Fotos':'Rechnungen', date:datum||today(), note:''
+  }));
+  // Gelöste verlieren nur den Bezug, nicht ihr Dasein.
+  for(const id of anhaenge.off){ const doc=S.docs.find(x=>x.id===id); if(doc) delete doc[anhaenge.feld]; }
+  return true;
 }
 
 /* ---------- Vollbildanzeige für Dokumente ---------- */
@@ -1855,37 +1921,13 @@ const A={
          <div class="two"><select name="pPick" id="logPartPick"></select><button class="btn" data-a="logPartAn">Verknüpfen</button></div>
        </div>
        <p class="dhint">Verknüpfte Teile stehen auch im Reiter Teile – sie liegen dort und nicht doppelt. Das × löst sie nur von diesem Eintrag. Ihr Preis steckt in den Kosten dieses Eintrags und zählt in der Gesamtsumme nicht noch einmal mit.</p>`+
-      `<label>Dokumente</label>
-       <div class="filebox"><button class="btn" data-a="pickCam">Scannen</button><button class="btn" data-a="pickFile">Datei wählen</button></div>
-       <input type="file" id="fCam" accept="image/*" capture="environment" hidden>
-       <input type="file" id="fPick" accept="image/*,application/pdf" hidden>
-       <div class="dlist" id="logDocs"></div>
-       <p class="dhint">Angehängte Dokumente stehen auch im Reiter Dokumente – sie liegen dort und nicht doppelt. Das × löst sie nur von diesem Eintrag; gelöscht werden sie im Reiter Dokumente.</p>`,
+      anhangFeld('Angehängte Dokumente und Bilder stehen auch im Reiter Dokumente – sie liegen dort und nicht doppelt, Bilder unter der Kategorie Fotos. Das × löst sie nur von diesem Eintrag; gelöscht werden sie im Reiter Dokumente.'),
       async()=>{
         const o=vals(); if(!o.title) return showErr('Bitte einen Titel eintragen.');
-        // Erst die Bilder ablegen: Scheitert das, ist am Eintrag noch nichts
-        // geändert. Was in diesem Durchgang schon geschrieben wurde, räumen wir
-        // wieder weg, damit keine verwaisten Bilder zurückbleiben.
-        const geschrieben=[];
-        for(const n of logDocs.add){
-          const did=uid();
-          if(!await store.set('img:'+did,n.data)){
-            for(const w of geschrieben){ await store.del('img:'+w); delete IMG['img:'+w]; }
-            return showErr('Ein Dokument ließ sich nicht speichern. Die Datei ist evtl. zu groß.');
-          }
-          IMG['img:'+did]=n.data; n.docId=did; geschrieben.push(did);
-        }
+        // Erst die Anhänge ablegen: Scheitert das, ist am Eintrag noch nichts
+        // geändert.
+        if(!await anhaengeAblegen(o.title,o.date)) return;
         if(isNew) S.logs.push({id:logId,...o}); else Object.assign(l,o);
-        // Durchnummeriert wird nur, wenn am Eintrag mehr als ein Dokument hängt.
-        const vorhanden=docsOf(logId).filter(x=>!logDocs.off.includes(x.id)).length;
-        const mehrere=logDocs.add.length+vorhanden>1;
-        logDocs.add.forEach((n,i)=>S.docs.push({
-          id:n.docId, type:n.type, logId,
-          title:o.title+(mehrere?' ('+(vorhanden+i+1)+')':''),
-          category:'Rechnungen', date:o.date||today(), note:''
-        }));
-        // Gelöste Dokumente verlieren nur den Bezug, nicht ihr Dasein.
-        for(const id of logDocs.off){ const doc=S.docs.find(x=>x.id===id); if(doc) delete doc.logId; }
         // Teile: neu angelegte dazu, vorgemerkte verknüpfen, gelöste nur lösen.
         for(const n of logParts.add) S.parts.push({
           id:uid(), logId, name:n.name, category:n.category, status:'Verbaut',
@@ -1904,16 +1946,16 @@ const A={
         for(const p of partsOf(l.id)) delete p.logId;
         S.logs=S.logs.filter(x=>x.id!==l.id); await save(); dismissModal();
       });
-    logDocs={logId,add:[],off:[]};
+    anhaenge={feld:'logId',id:logId,add:[],off:[]};
     logParts={logId,add:[],an:[],off:[]};
-    renderLogDocs(); renderLogParts();
+    renderAnhaenge(); renderLogParts();
   },
-  logDocOff:(d)=>{
-    if(!logDocs) return;
-    const vorher=logDocs.add.length;
-    logDocs.add=logDocs.add.filter(n=>n.tmp!==d.id);
-    if(logDocs.add.length===vorher&&!logDocs.off.includes(d.id)) logDocs.off.push(d.id);
-    renderLogDocs();
+  anhangOff:(d)=>{
+    if(!anhaenge) return;
+    const vorher=anhaenge.add.length;
+    anhaenge.add=anhaenge.add.filter(n=>n.tmp!==d.id);
+    if(anhaenge.add.length===vorher&&!anhaenge.off.includes(d.id)) anhaenge.off.push(d.id);
+    renderAnhaenge();
   },
   logPartNeu:()=>{
     if(!logParts) return;
@@ -1955,30 +1997,57 @@ const A={
       ['Teilenummer',esc(p.partno||dash)]
     ];
     const l=p.logId&&S.logs.find(x=>x.id===p.logId);
+    const anh=docsOfPart(p.id);
     openSheet(p.name||'Teil',
       `<div class="stats">${zeilen.map(z=>`<div class="stat"><span>${z[0]}</span><b class="long">${z[1]}</b></div>`).join('')}</div>`+
       (p.note?`<label>Notiz</label><p class="rmeta nl">${esc(p.note)}</p>`:'')+
-      (l?`<p class="dhint">Gehört zum Logbuch-Eintrag <b>${esc(l.title)}</b>. Der Preis steckt in den Kosten dieses Eintrags und zählt in der Gesamtsumme nicht noch einmal mit.</p>`:''),
+      (l?`<p class="dhint">Gehört zum Logbuch-Eintrag <b>${esc(l.title)}</b>. Der Preis steckt in den Kosten dieses Eintrags und zählt in der Gesamtsumme nicht noch einmal mit.</p>`:'')+
+      `<label>Dokumente und Bilder</label>`+
+      (anh.length?anh.map(doc=>`
+        <button class="item" data-a="openDoc" data-id="${doc.id}">
+          <div class="ico" data-thumb="${doc.id}">${anhangKuerzel(doc.type,doc.category)}</div>
+          <div class="mid"><div class="t">${esc(doc.title)}</div><div class="s">${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}</div></div>
+        </button>`).join('')
+       :'<p class="dhint">Nichts angehängt.</p>'),
       null,null,
       `<button class="btn ghost ico" data-a="editPart" data-id="${p.id}" aria-label="Teil bearbeiten"><svg viewBox="0 0 24 24">${ICONS.edit}</svg></button>`);
+    // Vorschaubilder nachziehen - hydrateImages deckt nur die Reiter ab.
+    for(const doc of anh) if(doc.type==='image') loadImg('img:'+doc.id).then(data=>{
+      const el=document.querySelector(`#sbody [data-thumb="${doc.id}"]`);
+      if(data&&el){ el.style.backgroundImage=`url(${data})`; el.textContent=''; }
+    });
   },
 
   addPart:()=>A.editPart({}),
   editPart:d=>{
     const p=S.parts.find(x=>x.id===d.id)||{date:today(),category:(partFilter!=='Alle'?partFilter:'Motor'),status:'Verbaut'};
     const isNew=!p.id;
+    // Die Kennung steht schon vor dem Speichern fest, damit die Anhänge sich
+    // darauf beziehen können - wie beim Logbuch-Eintrag. Gespeichert wird sie
+    // erst, wenn das Teil es wird.
+    const partId=p.id||uid();
     openSheet(isNew?'Neues Teil':'Teil bearbeiten',
       field('Bezeichnung','name',p.name,'text','placeholder="z. B. Sportluftfilter"')+
       `<div class="two">${select('Kategorie','category',PARTCATS,p.category)}${select('Status','status',STATUS,p.status)}</div>`+
       `<div class="two">${field('Preis (€)','price',p.price||'','number','inputmode="decimal" step="0.01"')}${field('Kaufdatum','date',p.date,'date')}</div>`+
       `<div class="two">${field('Händler','vendor',p.vendor)}${field('Teilenummer','partno',p.partno)}</div>`+
-      `<label>Notiz</label><textarea name="note">${esc(p.note)}</textarea>`,
+      `<label>Notiz</label><textarea name="note">${esc(p.note)}</textarea>`+
+      anhangFeld('Angehängte Dokumente und Bilder stehen auch im Reiter Dokumente – sie liegen dort und nicht doppelt, Bilder unter der Kategorie Fotos. Das × löst sie nur von diesem Teil; gelöscht werden sie im Reiter Dokumente.'),
       async()=>{
         const o=vals(); if(!o.name) return showErr('Bitte eine Bezeichnung eintragen.');
-        if(isNew) S.parts.push({id:uid(),...o}); else Object.assign(p,o);
+        // Erst die Anhänge: Scheitert das, ist am Teil noch nichts geändert.
+        if(!await anhaengeAblegen(o.name,o.date)) return;
+        if(isNew) S.parts.push({id:partId,...o}); else Object.assign(p,o);
         await save(); dismissModal();
       },
-      isNew?null:async()=>{S.parts=S.parts.filter(x=>x.id!==p.id);await save();dismissModal();});
+      isNew?null:async()=>{
+        // Das Teil geht, seine Anhänge bleiben und verlieren nur den Bezug -
+        // dieselbe Entscheidung wie beim Logbuch-Eintrag.
+        for(const doc of docsOfPart(p.id)) delete doc.partId;
+        S.parts=S.parts.filter(x=>x.id!==p.id);await save();dismissModal();
+      });
+    anhaenge={feld:'partId',id:partId,add:[],off:[]};
+    renderAnhaenge();
   },
 
   addDoc:()=>{
@@ -1998,10 +2067,17 @@ const A={
         S.docs.push({id,type:pending.type,...o}); await save(); dismissModal();
       });
   },
-  // Die App nimmt selbst auf. docAufnehmen liest logDocs erst beim Aufruf aus -
-  // die Maske darunter bleibt ja offen, also landet das Bild am richtigen Ort.
-  pickCam:()=>openKamera(r=>docAufnehmen(r,'Aufnahme-'+today()+'.jpg')),
-  pickFile:()=>$('#fPick').click(),
+  /* Die App nimmt selbst auf. docAufnehmen liest anhaenge und anhangArt erst
+     beim Ablegen aus - die Maske darunter bleibt ja offen, also landet das
+     Ergebnis am richtigen Ort und mit der richtigen Art.
+
+     Dokument und Bild gehen durch denselben Zuschnitt; unterschiedlich ist
+     allein die Kategorie am Ende. Beim Bild lässt die Dateiauswahl nur Bilder
+     zu - eine PDF wäre dort kein Bild. */
+  pickCam:()=>{ anhangArt='dok'; openKamera(r=>docAufnehmen(r,'Aufnahme-'+today()+'.jpg')) },
+  pickFile:()=>{ anhangArt='dok'; const i=$('#fPick'); i.accept='image/*,application/pdf'; i.click() },
+  pickFotoCam:()=>{ anhangArt='foto'; openKamera(r=>docAufnehmen(r,'Foto-'+today()+'.jpg')) },
+  pickFotoFile:()=>{ anhangArt='foto'; const i=$('#fPick'); i.accept='image/*'; i.click() },
   openDoc:async d=>{
     const doc=S.docs.find(x=>x.id===d.id); if(!doc) return;
     const data=await loadImg('img:'+doc.id);

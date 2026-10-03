@@ -212,7 +212,7 @@ export default async function ({ browser, base, ok }) {
   await page.fill('[name="title"]', 'Inspektion');
   await page.setInputFiles('#fPick', BILD);
   await bildDurchwinken(page);
-  await page.waitForSelector('#logDocs .d');
+  await page.waitForSelector('#anhaenge .d');
   await page.click('[data-a="ok"]');
   await page.waitForSelector('.item');
   await lesen();

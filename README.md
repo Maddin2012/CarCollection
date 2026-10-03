@@ -26,7 +26,8 @@ Niemals Fotos, Fahrzeugpapiere oder Rechnungen ins Repository committen.
 ## Funktionen
 
 Die untere Leiste führt durch ein geöffnetes Fahrzeug und ist mit
-**Cars**, **Scheckheft**, **Dokumente** und **Ersatzteile** beschriftet; die
+**Cars** (Auto von vorn), **Scheckheft** (Schraubenschlüssel), **Dokumente**
+(Blatt) und **Ersatzteile** (Sechskantmutter) beschriftet; die
 Kopfzeile nennt denselben Namen. Innerhalb der Ansichten stehen weiter die
 Begriffe *Logbuch* und *Teile* — umbenannt sind nur Leiste und Kopfzeile, und
 auch dieser Text bleibt bei den gewachsenen Namen.
@@ -416,7 +417,7 @@ die App:
 
 | Reihe | Prüft |
 | --- | --- |
-| `grundfunktionen` | Speicherung in IndexedDB, Überleben von Neuladen und neuem Tab, Manifest, Icons, Service Worker, Offline-Betrieb, Beschriftung der unteren Leiste samt Gleichlauf mit der Kopfzeile |
+| `grundfunktionen` | Speicherung in IndexedDB, Überleben von Neuladen und neuem Tab, Manifest, Icons, Service Worker, Offline-Betrieb, Beschriftung der unteren Leiste samt Gleichlauf mit der Kopfzeile, vier eigene Reiter-Symbole |
 | `sicherung` | Export, vollständiges Leeren des Speichers, Wiedereinlesen samt Bildern, Zusammenführen ohne Duplikate, Abweisen fremder Dateien |
 | `plattformen` | beide Plattform-Pfade, indem Safaris Eigenheiten im Chromium nachgestellt werden; dazu Chromes Erlaubnisliste fürs Teilen |
 | `navigation` | Zurück-Geste über Garage, Fahrzeug, Sheets und Vollbild; kein toter History-Eintrag nach dem Schließen |

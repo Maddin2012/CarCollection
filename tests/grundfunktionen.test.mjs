@@ -106,6 +106,20 @@ export default async function ({ browser, base, ok }) {
       `"${b.text}" passt bei 360 px in den Knopf (${b.breit} von ${b.platz} px)`);
   }
 
+  // Die vier Symbole der Leiste. Zwei gleiche wären in der Leiste nicht zu
+  // unterscheiden - geprüft wird deshalb, dass alle vier eigene Pfade sind.
+  const symbole = await page.evaluate(() =>
+    ['card', 'log', 'doc', 'part'].map(k => ICONS[k]));
+  ok(new Set(symbole).size === 4,
+    `Alle vier Reiter tragen ein eigenes Symbol (${new Set(symbole).size} von 4)`);
+  // Seit Fassung 18 ist der erste Reiter ein Auto von vorn, keine Karteikarte.
+  ok(!symbole[0].includes('<rect'),
+    'Der erste Reiter ist keine Karteikarte mehr');
+  ok((symbole[0].match(/<path/g) || []).length === 3,
+    `Das Auto besteht aus Dach, Wagenkasten und Scheinwerfern (${(symbole[0].match(/<path/g) || []).length} Pfade)`);
+  ok(await page.locator('[data-a="tab"][data-k="card"] svg path').count() === 3,
+    'Und wird in der Leiste auch so gezeichnet');
+
   await page.setViewportSize({ width: 1280, height: 720 });
 
   // Kopfzeile und Leiste stammen seit Fassung 17 aus derselben Quelle. Geprüft

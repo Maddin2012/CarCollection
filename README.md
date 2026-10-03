@@ -437,6 +437,7 @@ die App:
 | `lesen` | Dokument und Teil nur ansehen, Ändern über den Stift, Bilddatei am Speicher geprüft |
 | `anhaenge` | Bild und Dokument am Eintrag und am Teil, Kategorien getrennt, Abbrechen am Speicher geprüft |
 | `blatt` | Blatt wegziehen mit selbst erzeugten Zeiger-Ereignissen: Schwelle, Zurückfedern, wo der Zug beginnen darf, und dass danach kein toter History-Eintrag bleibt |
+| `kategorien` | Mehrere Kategorien je Scheckheft-Eintrag: An- und Abwählen, Speicher, Liste und Leseblatt, ältere Einträge mit einer einzelnen Kategorie, unbekannte Werte, Sicherung |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter

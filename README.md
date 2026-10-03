@@ -481,7 +481,7 @@ Einmalig im Repository unter **Settings** zu erledigen:
 1. **Default-Branch** – `General` → `Default branch` → auf `main` umstellen.
 2. **GitHub Pages** – `Pages` → Source `Deploy from a branch`, Branch `main`,
    Ordner `/ (root)`. Nach ein bis zwei Minuten liegt die App unter
-   `https://maddin2012.github.io/Garage/`.
+   `https://maddin2012.github.io/CarCollection/`.
 3. **Ruleset** – `Rules` → `Rulesets` → `New branch ruleset`:
    - Name z. B. `main schützen`, Enforcement status `Active`
    - Target branches → `Include default branch`
@@ -508,12 +508,14 @@ nicht. Also installieren — oder regelmäßig sichern.
 
 ### Die Kennung der App
 
-Das Manifest trägt ein ausdrückliches `"id": "/Garage/app"`. Ohne dieses Feld
+Das Manifest trägt ein ausdrückliches `"id": "/CarCollection/app"`. Ohne dieses Feld
 leitet Chrome die Kennung aus `start_url` ab — eine spätere Änderung daran ließe
 die installierte App stillschweigend verwaisen.
 
 **Dieser Wert darf nicht mehr geändert werden.** Chrome hielte die App danach
 für eine andere. Eine Prüfung in `grundfunktionen` nagelt ihn deshalb fest.
+Geändert wurde er bisher nur zusammen mit der Adresse (Fassung 23 und 24, siehe
+unten) — eine neue Adresse ist für Chrome ohnehin eine neue App.
 
 ### Wenn Chrome „Diese App wurde bereits installiert" meldet
 
@@ -539,16 +541,19 @@ zu öffnen" mit **„App konnte nicht geöffnet werden"** endet.
 
 **Was nicht geholfen hat**, festgehalten, damit es niemand wiederholt: eine neue
 Kennung im Manifest (Fassung 21/22) und der Umzug unter einen neuen Pfad
-(Fassung 23, Repository umbenannt in `Garage`). Beides bleibt trotzdem: Die
-ausdrückliche Kennung ist ohnehin richtig, das Manifest vom Netz zu holen
-ebenfalls (siehe unten), und ein Zurückbenennen würde nur die Adresse erneut
-ändern. Seit dem Umzug liegt die App unter `maddin2012.github.io/Garage/`; die
-alte Adresse `…/CarCollection/` führt ins Leere, GitHub leitet Pages-Seiten nach
-einer Umbenennung nicht um.
+(Fassung 23, Repository umbenannt in `Garage`). Die ausdrückliche Kennung
+bleibt, sie ist ohnehin richtig; ebenso, das Manifest vom Netz zu holen (siehe
+unten). Den Umzug hat Fassung 24 zurückgenommen: Das Repository heißt wieder
+`CarCollection`, die App liegt wieder unter `maddin2012.github.io/CarCollection/`,
+die Kennung lautet `/CarCollection/app`. Die Zwischenadresse `…/Garage/` führt
+ins Leere — GitHub leitet Pages-Seiten nach einer Umbenennung nicht um. Eine
+unter `/Garage/` installierte App bekommt keine Updates mehr; sie wird
+deinstalliert und unter der alten Adresse neu installiert.
 
 **Zum Speicher:** Er hängt an der Herkunft `maddin2012.github.io`, nicht am Pfad
-und nicht an der Kennung. Beim Umzug kamen die Fahrzeuge deshalb mit. Umgekehrt
-löscht Schritt 2 oben die Akte — davor sichern.
+und nicht an der Kennung. Beim Umzug und beim Zurückbenennen kamen die
+Fahrzeuge deshalb mit. Umgekehrt löscht Schritt 2 oben die Akte — davor
+sichern.
 
 **Das Manifest kommt nie aus dem Cache.** Der Service Worker holt es
 wie `version.json` immer vom Netz und greift nur offline auf den Cache zurück.

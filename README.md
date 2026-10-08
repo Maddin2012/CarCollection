@@ -35,8 +35,9 @@ auch dieser Text bleibt bei den gewachsenen Namen.
 - **Garage** – Übersicht aller Fahrzeuge als Karten, mit Warnbanner für
   abgelaufenen oder bald fälligen TÜV.
 - **Fahrzeugkarte** – Titelbild, Kilometerstand, Baujahr, TÜV-Datum, letzter
-  Service, FIN, HSN und TSN sowie eine Kostenübersicht. Die übrigen Felder
-  (Leistung, Hubraum, Kraftstoff) bleiben in der Bearbeiten-Maske erfassbar.
+  Service, FIN, HSN, TSN, MKB und GKB (Motor- und Getriebekennbuchstaben) sowie
+  eine Kostenübersicht. Die übrigen Felder (Leistung, Hubraum, Kraftstoff)
+  bleiben in der Bearbeiten-Maske erfassbar.
 - **Vorspann** – beim Öffnen stehen drei Sekunden lang die Bildmarke und der
   Name auf dunklem Grund. Die App lädt darunter schon; abkürzen lässt er sich
   bewusst nicht.

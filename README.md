@@ -32,7 +32,9 @@ Kopfzeile nennt denselben Namen. Innerhalb der Ansichten stehen weiter die
 Begriffe *Logbuch* und *Teile* — umbenannt sind nur Leiste und Kopfzeile, und
 auch dieser Text bleibt bei den gewachsenen Namen.
 
-- **Garage** – die Fahrzeuge als große Karten zum Durchwischen; die nächste
+- **Garage** – die Fahrzeuge als große Karten im Hochformat zum Durchwischen:
+  Das Titelbild füllt die Karte, Name, Kennzeichen, km und TÜV stehen unten
+  darauf, und die Karte reicht bis kurz über den unteren Rand. Die nächste
   lugt rechts herein, Punkte darunter zeigen die Stelle. Nach dem Öffnen eines
   Fahrzeugs führt Zurück wieder zu ihm. Neue Fahrzeuge über das Plus oben neben
   dem Zahnrad. Darüber das Warnbanner für abgelaufenen oder bald fälligen TÜV.
@@ -446,7 +448,7 @@ die App:
 | `kategorien` | Mehrere Kategorien je Scheckheft-Eintrag: An- und Abwählen, Speicher, Liste und Leseblatt, ältere Einträge mit einer einzelnen Kategorie, unbekannte Werte, Sicherung |
 | `vorspann` | Vorspann beim Öffnen: steht ab Seitenstart, fängt Tipps ab, verzögert den Start der App nicht, nach 3 Sekunden ganz weg; die übrigen Reihen schalten ihn ab |
 | `installationskarte` | QR-Code der Karte in `karte/` führt auf die Adresse aus `CLAUDE.md`; PDF mit einer Seite; die Verweise der README gehen nicht ins Leere |
-| `garage` | Karussell der Garage: Karten nebeneinander und groß, Nachbar lugt herein, Einrasten nach einer Scroll-Geste, Punkte, gemerkte Stelle nach Öffnen und Zurück, Plus oben, Platzhalter, ein Fahrzeug, leere Garage. Touch-Gesten kommen im Testbrowser nicht an – geprüft ist das Scrollen, nicht der Finger |
+| `garage` | Karussell der Garage: Karten nebeneinander, im Hochformat und bis unten, Bild füllt die Karte, Höhe folgt dem Fenster, Nachbar lugt herein, Einrasten nach einer Scroll-Geste, Punkte, gemerkte Stelle nach Öffnen und Zurück, Plus oben, Platzhalter, ein Fahrzeug, leere Garage. Touch-Gesten kommen im Testbrowser nicht an – geprüft ist das Scrollen, nicht der Finger |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter

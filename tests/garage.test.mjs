@@ -48,6 +48,34 @@ export default async function ({ browser, base, ok }) {
   ok(z.punkte === 3 && z.aktiv === 0, `Drei Punkte, der erste aktiv (${z.punkte}, aktiv ${z.aktiv})`);
   ok(await page.locator('.add').count() === 0, 'Keine Kachel zum Hinzufügen im Karussell');
 
+  // --- Hochformat (Fassung 31) ---
+  const form = () => page.evaluate(() => {
+    const c = document.querySelector('#karussell>.card'), r = c.getBoundingClientRect();
+    const inn = c.querySelector('.card-in').getBoundingClientRect(), f = c.querySelector('.photo').getBoundingClientRect();
+    const fu = c.querySelector('.fuss'), fr = fu ? fu.getBoundingClientRect() : null;
+    return { w: r.width, h: r.height, unten: r.bottom, ih: innerHeight,
+      bildDeckt: Math.abs(f.left - inn.left) < 1 && Math.abs(f.top - inn.top) < 1 && Math.abs(f.right - inn.right) < 1 && Math.abs(f.bottom - inn.bottom) < 1,
+      fussUnten: !!fr && Math.abs(fr.bottom - inn.bottom) < 1 && fr.top > inn.top + inn.height / 2,
+      nameIm: !!fu && !!fu.querySelector('.mh b') };
+  });
+  let f = await form();
+  ok(f.h >= 1.25 * f.w - 1, `Die Karte steht im Hochformat (${Math.round(f.w)} × ${Math.round(f.h)} px)`);
+  ok(f.bildDeckt, 'Das Titelbild füllt die ganze Karte');
+  ok(f.fussUnten && f.nameIm, 'Name und Angaben liegen unten über dem Bild');
+  // Ohne Hinweise darüber reicht die Karte bis kurz über den Fensterrand -
+  // genau der leere Raum darunter war das, was gestört hat.
+  await page.evaluate(() => { geschuetzt = true; sicherungDatum = new Date().toISOString(); render(); });
+  f = await form();
+  ok(f.ih - f.unten <= 80 && f.unten <= f.ih,
+    `Ohne Hinweise füllt sie den Platz bis unten (${Math.round(f.ih - f.unten)} px Rest für die Punkte)`);
+  // Die Höhe folgt dem Fenster.
+  await page.setViewportSize({ width: 412, height: 760 });
+  await page.waitForTimeout(100);
+  const f2 = await form();
+  ok(f2.h < f.h - 50 && f2.ih - f2.unten <= 80, `Bei kleinerem Fenster wird sie neu gerechnet (${Math.round(f.h)} → ${Math.round(f2.h)} px)`);
+  await page.setViewportSize({ width: 412, height: 892 });
+  await page.waitForTimeout(100);
+
   // --- Wischen ---
   const cdp = await ctx.newCDPSession(page);
   const wische = async dx => {
@@ -94,6 +122,8 @@ export default async function ({ browser, base, ok }) {
   await page.waitForTimeout(100);
   z = await lage();
   ok(z.doc <= z.iw, `Bei 360 px rollt die Seite selbst nicht seitlich (${z.doc} von ${z.iw} px)`);
+  const f3 = await form();
+  ok(f3.h >= 1.25 * f3.w - 1, `Auch bei 360 px Hochformat (${Math.round(f3.w)} × ${Math.round(f3.h)} px)`);
   // Die Karte ist immer 44 px schmaler als der Platz, damit die nächste
   // hereinlugt - bei 360 px sind das 79 % (284 px). Gemessen, nicht geschätzt.
   ok(z.karten[0].w >= 0.75 * z.iw, `Und die Karten sind weiter groß (${Math.round(z.karten[0].w)} von ${z.iw} px)`);

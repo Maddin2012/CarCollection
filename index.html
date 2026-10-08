@@ -67,6 +67,16 @@ button.card{display:block;width:100%;border:0;text-align:left;color:inherit;curs
 .mini .ms>span{white-space:nowrap}
 .mini .ms .pill{margin:0;font-size:12.5px;padding:3px 8px}
 #topBtn{display:flex;gap:8px}
+/* Hochformat (Fassung 31): Die Karte ist so hoch, wie bis unten Platz ist
+   (--karte-h, ausgerechnet in karussellHoehe), das Titelbild füllt sie ganz,
+   und Name, Kennzeichen, km und TÜV liegen unten auf einem dunklen Verlauf -
+   so bleiben sie auch auf hellen Fotos lesbar. */
+.karussell>.card{height:var(--karte-h,auto)}
+.karussell .card-in{position:relative;height:100%}
+.karussell .photo{position:absolute;inset:0;aspect-ratio:auto;align-items:flex-start;padding-top:30%}
+.karussell .photo::after{background:none}
+.karussell .fuss{position:absolute;left:0;right:0;bottom:0;z-index:2;padding-top:64px;background:linear-gradient(rgba(10,14,22,0),rgba(10,14,22,.8) 45%,rgba(10,14,22,.95))}
+.karussell .mini .mh{margin-top:0}
 .alert{margin-bottom:16px;border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:14px;background:var(--surface);overflow:hidden}
 .alert button{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:11px 14px;font-size:14px}
 .alert button:first-child{border-top:0}
@@ -300,7 +310,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',mkb:'',gkb:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='30';
+const APP_VERSION='31';
 let S=null, VEH={}, IDX=[], view='garage';
 // Das Fahrzeug, bei dem das Garagen-Karussell zuletzt stand. Wer ein Fahrzeug
 // öffnet und zurückgeht, landet wieder dort und nicht beim ersten.
@@ -757,9 +767,11 @@ function renderGarage(){
     const i=tuevInfo(x.v);
     return `<button class="card mini" data-a="open" data-id="${x.id}" data-pos="${x.id}"><div class="card-in">
       <div class="photo" data-cover="${x.id}">${x.cover?'':'<div class="ph">Kein Bild</div>'}</div>
-      <div class="mh"><b>${esc(x.v.name||'Fahrzeug')}</b><span>${esc(x.v.variant)||'&nbsp;'}</span></div>
-      <div class="ms">${x.v.plate?`<span class="plate flat">${esc(x.v.plate)}</span>`:'<span>Kein Kennzeichen</span>'}</div>
-      <div class="ms sub"><span>${x.v.km?km(x.v.km):'–'}</span>${i?`<span class="pill ${i.c}">TÜV ${dt(x.v.tuev)}</span>`:''}</div>
+      <div class="fuss">
+        <div class="mh"><b>${esc(x.v.name||'Fahrzeug')}</b><span>${esc(x.v.variant)||'&nbsp;'}</span></div>
+        <div class="ms">${x.v.plate?`<span class="plate flat">${esc(x.v.plate)}</span>`:'<span>Kein Kennzeichen</span>'}</div>
+        <div class="ms sub"><span>${x.v.km?km(x.v.km):'–'}</span>${i?`<span class="pill ${i.c}">TÜV ${dt(x.v.tuev)}</span>`:''}</div>
+      </div>
     </div></button>`}).join('');
   // Ein Fahrzeug, dessen Datensatz sich nicht lesen ließ, verschweigt die App
   // nicht und streicht es auch nicht. Es steht als Platzhalter da, und seine
@@ -767,9 +779,11 @@ function renderGarage(){
   const kaputt=IDX.filter(id=>!VEH[id]).map(id=>
     `<div class="card mini tot" data-pos="${esc(id)}"><div class="card-in">
       <div class="photo"><div class="ph">Nicht lesbar</div></div>
-      <div class="mh"><b>Fahrzeug nicht lesbar</b><span>Kennung ${esc(id)}</span></div>
-      <div class="ms"><span>Der Datensatz ließ sich nicht öffnen.</span></div>
-      <div class="ms sub"><span>Einstellungen → Datenrettung</span></div>
+      <div class="fuss">
+        <div class="mh"><b>Fahrzeug nicht lesbar</b><span>Kennung ${esc(id)}</span></div>
+        <div class="ms"><span>Der Datensatz ließ sich nicht öffnen.</span></div>
+        <div class="ms sub"><span>Einstellungen → Datenrettung</span></div>
+      </div>
     </div></div>`).join('');
   // Die stille Update-Prüfung beim Start meldet sich nur, wenn es etwas gibt.
   const upd=updateReady?`<div class="alert" id="updAlert" role="status"><button data-a="settings"><b>Neue Fassung ${esc(updateReady)} liegt bereit</b><span> – App einmal schließen und neu öffnen.</span></button></div>`:'';
@@ -800,8 +814,23 @@ function karussellPunkte(){
   document.querySelectorAll('#punkte button').forEach((b,j)=>{b.classList.toggle('an',j===i);b.setAttribute('aria-current',j===i?'true':'false')});
   const c=karussellKarten()[i]; if(c) garagePos=c.dataset.pos;
 }
+/* Höhe der Karten: so viel, wie unter dem Karussell bis zum Fensterrand frei
+   ist - abzüglich der Punkte und etwas Luft für die Gestenleiste. Mindestens
+   1,25 × Breite, damit sie auch dann Hochformat bleibt, wenn Hinweise darüber
+   viel Platz nehmen (dann rollt die Seite); höchstens 2,1 × Breite, damit sie
+   auf einem Tablet nicht zur Säule wird. */
+function karussellHoehe(){
+  const k=$('#karussell'), c=k&&k.querySelector('.card'); if(!c) return;
+  const breite=c.offsetWidth, cs=getComputedStyle(k);
+  const oben=k.getBoundingClientRect().top+window.scrollY+parseFloat(cs.paddingTop);
+  const unten=parseFloat(cs.paddingBottom)+($('#punkte')?20:0)+16;
+  const frei=innerHeight-oben-unten;
+  k.style.setProperty('--karte-h',Math.round(Math.min(breite*2.1,Math.max(breite*1.25,frei)))+'px');
+}
+addEventListener('resize',()=>{ if(view==='garage') karussellHoehe(); });
 function karussellEinrichten(){
   const k=$('#karussell'); if(!k) return;
+  karussellHoehe();
   const karten=karussellKarten();
   const i=Math.max(0,karten.findIndex(c=>c.dataset.pos===garagePos));
   if(karten[i]) k.scrollLeft=karten[i].offsetLeft-karten[0].offsetLeft;

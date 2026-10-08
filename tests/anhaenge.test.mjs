@@ -185,7 +185,7 @@ export default async function ({ browser, base, ok }) {
   // --- Die Sicherung trägt das Foto mit ---
   // Das belegt, dass die eine Ablage hält: collectBackup musste nichts lernen.
   await page.goBack();
-  await page.waitForSelector('.mini, .grid');
+  await page.waitForSelector('.mini, .karussell');
   await page.click('[data-a="settings"]');
   await page.waitForSelector('[data-a="backupOut"]');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-a="backupOut"]')]);

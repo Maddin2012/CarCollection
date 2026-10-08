@@ -235,7 +235,7 @@ export default async function ({ browser, base, ok }) {
 
   // --- Das Zahnrad ---
   await page.goBack();
-  await page.waitForSelector('.grid, .mini');
+  await page.waitForSelector('.karussell, .mini');
   const pfade = await page.evaluate(() => ({ gear: ICONS.gear, part: ICONS.part, log: ICONS.log }));
   ok(pfade.gear !== pfade.part, 'Zahnrad und Ersatzteil-Symbol sind nicht derselbe Pfad');
   ok(pfade.part !== pfade.log, 'Ersatzteil-Symbol und Logbuch-Symbol sind nicht derselbe Pfad');

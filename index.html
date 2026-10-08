@@ -44,17 +44,29 @@ button{font:inherit;color:inherit;cursor:pointer}
 .actions{flex-wrap:wrap}
 .actions .wide{flex:1 1 100%}
 button.card{display:block;width:100%;border:0;text-align:left;color:inherit;cursor:pointer}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+/* Garage zum Durchwischen (Fassung 30): eine Karte füllt fast die Breite, die
+   nächste lugt rechts herein. Gewischt wird über das eingebaute Einrasten des
+   Browsers - Schwung und Einrasten wie in einer nativen Liste, ohne eigenen
+   Zeigercode. Das Karussell reicht bis an den Fensterrand (negativer Rand
+   gegen den Innenabstand von .wrap); die Seite selbst rollt nicht seitlich. */
+.karussell{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:none;margin:0 -16px;padding:4px 16px 26px;scroll-padding:0 16px}
+.karussell::-webkit-scrollbar{display:none}
+/* Der Schatten muss innerhalb des Karussells bleiben - es schneidet ab, was
+   über seinen Rand ragt, und ein harter Schnitt sähe aus wie eine Kante. */
+.karussell>.card{flex:0 0 calc(100% - 44px);scroll-snap-align:start;text-align:left;box-shadow:0 10px 18px rgba(0,0,0,.4)}
+.punkte{display:flex;justify-content:center;gap:4px;margin:-14px 0 8px}
+.punkte button{width:26px;height:26px;border:0;background:none;padding:0;display:flex;align-items:center;justify-content:center}
+.punkte button::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--line);transition:background .2s,transform .2s}
+.punkte button.an::before{background:var(--accent);transform:scale(1.25)}
 .mini .photo{aspect-ratio:4/3}
-.mini .mh{padding:0 12px;margin-top:-22px;position:relative;z-index:3}
-.mini .mh b{display:block;font-family:var(--font);font-size:18px;line-height:1.1}
-.mini .mh span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-.mini .ms{padding:8px 12px 0;font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:6px}
-.mini .ms.sub{padding:4px 12px 12px;flex-wrap:wrap;row-gap:3px}
+.mini .mh{padding:0 16px;margin-top:-30px;position:relative;z-index:3}
+.mini .mh b{display:block;font-family:var(--font);font-size:26px;line-height:1.1}
+.mini .mh span{display:block;color:var(--muted);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+.mini .ms{padding:10px 16px 0;font-size:15px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.mini .ms.sub{padding:6px 16px 16px;flex-wrap:wrap;row-gap:4px}
 .mini .ms>span{white-space:nowrap}
-.mini .ms .pill{margin:0;font-size:10.5px;padding:2px 6px}
-.add{border:1.5px dashed var(--line);border-radius:22px;background:transparent;color:var(--muted);min-height:190px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:14px}
-.add b{font-family:var(--font);font-size:34px;color:var(--accent);line-height:1}
+.mini .ms .pill{margin:0;font-size:12.5px;padding:3px 8px}
+#topBtn{display:flex;gap:8px}
 .alert{margin-bottom:16px;border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:14px;background:var(--surface);overflow:hidden}
 .alert button{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:11px 14px;font-size:14px}
 .alert button:first-child{border-top:0}
@@ -288,8 +300,11 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',mkb:'',gkb:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='29';
+const APP_VERSION='30';
 let S=null, VEH={}, IDX=[], view='garage';
+// Das Fahrzeug, bei dem das Garagen-Karussell zuletzt stand. Wer ein Fahrzeug
+// öffnet und zurückgeht, landet wieder dort und nicht beim ersten.
+let garagePos=null;
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='', backupNote='';
 const IMG={}; let persistent=true; const mem={};
@@ -677,6 +692,7 @@ const ICONS={
      (Zahnkranz), mit denen es sich sonst verwechseln ließe. */
   part:'<path d="M21.2 12L16.6 20L7.4 20L2.8 12L7.4 4L16.6 4Z"/><circle cx="12" cy="12" r="3.6"/>',
   edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
   close:'<path d="M6 6l12 12M18 6L6 18"/>',
   rot:'<path d="M4 9h11a4.5 4.5 0 0 1 0 9H8"/><path d="M7.5 5.5L4 9l3.5 3.5"/>',
   /* Ein geschlossener Zahnkranz mit sechs rechteckigen Zähnen plus Nabe,
@@ -728,7 +744,10 @@ function tuevInfo(v=S.v){
 function renderGarage(){
   $('#nav').style.display='none';
   $('#title').textContent='Garage'; $('#sub').textContent=IDX.length?IDX.length+(IDX.length===1?' Fahrzeug':' Fahrzeuge'):'';
-  $('#topBtn').innerHTML=`<button class="btn ghost ico" data-a="settings" aria-label="Einstellungen"><svg viewBox="0 0 24 24">${ICONS.gear}</svg></button>`;
+  // Seit Fassung 30 sitzt "Fahrzeug hinzufügen" als Plus neben dem Zahnrad;
+  // die gestrichelte Kachel im Raster gibt es nicht mehr.
+  $('#topBtn').innerHTML=`<button class="btn ghost ico" data-a="addVehicle" aria-label="Fahrzeug hinzufügen"><svg viewBox="0 0 24 24">${ICONS.plus}</svg></button>`
+    +`<button class="btn ghost ico" data-a="settings" aria-label="Einstellungen"><svg viewBox="0 0 24 24">${ICONS.gear}</svg></button>`;
   // Unlesbare Kennungen bleiben in IDX stehen, damit die Liste sie nicht
   // verliert - gezeichnet werden sie aber als Platzhalter, nicht als Karte.
   const list=IDX.map(id=>VEH[id]).filter(Boolean);
@@ -736,7 +755,7 @@ function renderGarage(){
   const banner=due.length?`<div class="alert" role="status">${due.map(x=>{const i=tuevInfo(x.v);return `<button data-a="open" data-id="${x.id}"><b>${esc(x.v.name||'Fahrzeug')}</b>: <span class="${i.c}">TÜV ${i.c==='danger'?'abgelaufen':'fällig'} (${i.t})</span></button>`}).join('')}</div>`:'';
   const cards=list.map(x=>{
     const i=tuevInfo(x.v);
-    return `<button class="card mini" data-a="open" data-id="${x.id}"><div class="card-in">
+    return `<button class="card mini" data-a="open" data-id="${x.id}" data-pos="${x.id}"><div class="card-in">
       <div class="photo" data-cover="${x.id}">${x.cover?'':'<div class="ph">Kein Bild</div>'}</div>
       <div class="mh"><b>${esc(x.v.name||'Fahrzeug')}</b><span>${esc(x.v.variant)||'&nbsp;'}</span></div>
       <div class="ms">${x.v.plate?`<span class="plate flat">${esc(x.v.plate)}</span>`:'<span>Kein Kennzeichen</span>'}</div>
@@ -746,7 +765,7 @@ function renderGarage(){
   // nicht und streicht es auch nicht. Es steht als Platzhalter da, und seine
   // Kennung bleibt in der Liste.
   const kaputt=IDX.filter(id=>!VEH[id]).map(id=>
-    `<div class="card mini tot"><div class="card-in">
+    `<div class="card mini tot" data-pos="${esc(id)}"><div class="card-in">
       <div class="photo"><div class="ph">Nicht lesbar</div></div>
       <div class="mh"><b>Fahrzeug nicht lesbar</b><span>Kennung ${esc(id)}</span></div>
       <div class="ms"><span>Der Datensatz ließ sich nicht öffnen.</span></div>
@@ -755,10 +774,39 @@ function renderGarage(){
   // Die stille Update-Prüfung beim Start meldet sich nur, wenn es etwas gibt.
   const upd=updateReady?`<div class="alert" id="updAlert" role="status"><button data-a="settings"><b>Neue Fassung ${esc(updateReady)} liegt bereit</b><span> – App einmal schließen und neu öffnen.</span></button></div>`:'';
   $('#view').innerHTML=upd+speicherAlarm()+(list.length||kaputt
-    ?banner+`<div class="grid">${cards}${kaputt}<button class="add" data-a="addVehicle"><b>+</b>Fahrzeug hinzufügen</button></div>`
+    ?banner+`<div class="karussell" id="karussell">${cards}${kaputt}</div>`
+      +(IDX.length>1?`<div class="punkte" id="punkte">${IDX.map((id,i)=>`<button data-a="garageZu" data-i="${i}" aria-label="Fahrzeug ${i+1} von ${IDX.length}"></button>`).join('')}</div>`:'')
     :`<div class="empty"><b>Deine Garage ist leer</b>Lege dein erstes Fahrzeug an. Jedes bekommt eine eigene Karte.</div><div class="actions"><button class="btn primary" data-a="addVehicle">Erstes Fahrzeug anlegen</button></div>`);
   (persistent||!IDX.length)||($('#view').insertAdjacentHTML('beforeend','<p class="note warn">Hinweis: Speichern ist in dieser Umgebung nicht verfügbar. Daten gehen beim Schließen verloren.</p>'));
+  karussellEinrichten();
   hydrateImages();
+}
+
+/* Das Karussell: bei dem Fahrzeug aufschlagen, bei dem man zuletzt stand, und
+   beim Wischen die Punkte und die gemerkte Stelle nachführen. */
+const karussellKarten=()=>[...document.querySelectorAll('#karussell>.card')];
+function karussellIndex(){
+  const k=$('#karussell'); if(!k) return 0;
+  const karten=karussellKarten(), links=k.scrollLeft+(k.firstElementChild?k.firstElementChild.offsetLeft:0);
+  // Am Ende lässt sich die letzte Karte nicht ganz nach links schieben -
+  // dort zählt sie trotzdem als die gezeigte.
+  if(k.scrollLeft>=k.scrollWidth-k.clientWidth-2) return karten.length-1;
+  let best=0, abst=Infinity;
+  karten.forEach((c,i)=>{const d=Math.abs(c.offsetLeft-links); if(d<abst){abst=d;best=i;}});
+  return best;
+}
+function karussellPunkte(){
+  const i=karussellIndex();
+  document.querySelectorAll('#punkte button').forEach((b,j)=>{b.classList.toggle('an',j===i);b.setAttribute('aria-current',j===i?'true':'false')});
+  const c=karussellKarten()[i]; if(c) garagePos=c.dataset.pos;
+}
+function karussellEinrichten(){
+  const k=$('#karussell'); if(!k) return;
+  const karten=karussellKarten();
+  const i=Math.max(0,karten.findIndex(c=>c.dataset.pos===garagePos));
+  if(karten[i]) k.scrollLeft=karten[i].offsetLeft-karten[0].offsetLeft;
+  karussellPunkte();
+  k.addEventListener('scroll',karussellPunkte,{passive:true});
 }
 
 /* Hinweise, die nicht in den Einstellungen versteckt gehören: Der Speicher war
@@ -1940,7 +1988,12 @@ const A={
   cover:()=>$('#coverIn').click(),
   coverOff:()=>{ if(!pendingCover) return; pendingCover.data=null; pendingCover.weg=true; renderCoverBox(); },
 
-  open:d=>{S=VEH[d.id];view='vehicle';tab='card';logFilter=partFilter='Alle';window._df='Alle';pushScreen();render();window.scrollTo(0,0)},
+  garageZu:d=>{
+    const k=$('#karussell'), c=karussellKarten()[Number(d.i)]; if(!k||!c) return;
+    const ruhig=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    k.scrollTo({left:c.offsetLeft-karussellKarten()[0].offsetLeft,behavior:ruhig?'auto':'smooth'});
+  },
+  open:d=>{garagePos=d.id;S=VEH[d.id];view='vehicle';tab='card';logFilter=partFilter='Alle';window._df='Alle';pushScreen();render();window.scrollTo(0,0)},
   settings:()=>{S=null;view='settings';updateNote=backupNote='';pushScreen();render();window.scrollTo(0,0)},
   // Die Einstellungen sind ein Bildschirm wie jeder andere: Schließen heißt zurück.
   closeSettings:()=>history.back(),

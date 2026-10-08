@@ -285,10 +285,10 @@ const DOCCATS=['Fahrzeugpapiere','TÜV / HU','Versicherung','Rechnungen','Fotos'
 const LOGTYPES=['Reparatur','Wartung','Umbau','Sonstiges'];
 const STATUS=['Verbaut','Auf Lager','Bestellt'];
 
-const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
+const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',mkb:'',gkb:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='28';
+const APP_VERSION='29';
 let S=null, VEH={}, IDX=[], view='garage';
 let tab='card', logFilter='Alle', partFilter='Alle';
 let updateReady='', updateNote='', backupNote='';
@@ -980,7 +980,11 @@ function viewCard(){
     ['Letzter Service',serv?dt(serv.date)+(serv.km?' · '+km(serv.km):''):dash,'long'],
     ['FIN',v.vin?esc(v.vin):dash,'long'],
     ['HSN (zu 2.1)',v.hsn?esc(v.hsn):dash],
-    ['TSN (zu 2.2)',v.tsn?esc(v.tsn):dash]
+    ['TSN (zu 2.2)',v.tsn?esc(v.tsn):dash],
+    // Motor- und Getriebekennbuchstaben: unter diesen Kürzeln führen Werkstatt
+    // und Teilehandel Motor und Getriebe (Fassung 29).
+    ['MKB (Motor)',v.mkb?esc(v.mkb):dash],
+    ['GKB (Getriebe)',v.gkb?esc(v.gkb):dash]
   ];
   return `
   <div class="card"><div class="card-in">
@@ -1876,6 +1880,7 @@ function vehicleSheet(isNew){
       :monthField('TÜV gültig bis','tuev',v.tuev)+field('FIN (optional)','vin',v.vin))+
     // Schlüsselnummern aus der Zulassungsbescheinigung Teil I
     `<div class="two paar">${field('HSN (zu 2.1)','hsn',v.hsn,'text','inputmode="numeric" maxlength="4" placeholder="4 Ziffern"')}${field('TSN (zu 2.2)','tsn',v.tsn,'text','maxlength="3" class="upper" placeholder="3 Zeichen"')}</div>`+
+    `<div class="two paar">${field('MKB (Motor)','mkb',v.mkb,'text','maxlength="5" class="upper" autocapitalize="characters" placeholder="z. B. CJXA"')}${field('GKB (Getriebe)','gkb',v.gkb,'text','maxlength="5" class="upper" autocapitalize="characters" placeholder="z. B. QDT"')}</div>`+
     `<div class="two paar">${field('Letzter Service','service',v.service,'date')}${field('km beim Service','serviceKm',v.serviceKm||'','number','inputmode="numeric"')}</div>
      <p class="dhint">Leer lassen, wenn der Service im Logbuch als Wartung steht – die Karte nimmt ihn von dort. Ein Datum hier ist für einen Service aus der Zeit vor der App; angezeigt wird immer das jüngere von beidem.</p>`+
     `<label>Titelbild</label>
@@ -1885,6 +1890,9 @@ function vehicleSheet(isNew){
       const o=normMonth(vals(),'tuev'); if(!o.name) return showErr('Bitte Marke und Modell eintragen.');
       o.hsn=(o.hsn||'').replace(/\D/g,'').slice(0,4);
       o.tsn=(o.tsn||'').toUpperCase().slice(0,3);
+      // Buchstaben und Ziffern - es gibt Kennbuchstaben mit Ziffern.
+      o.mkb=(o.mkb||'').replace(/\s/g,'').toUpperCase().slice(0,5);
+      o.gkb=(o.gkb||'').replace(/\s/g,'').toUpperCase().slice(0,5);
       o.serviceKm=o.serviceKm?Number(o.serviceKm):'';
       // Erst das Bild, dann das Fahrzeug: Scheitert das Ablegen, ist am
       // Fahrzeug noch nichts geändert und die Maske bleibt stehen.

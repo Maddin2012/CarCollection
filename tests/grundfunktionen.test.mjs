@@ -28,6 +28,10 @@ export default async function ({ browser, base, ok }) {
   await page.fill('[name="vin"]', 'WVWZZZ1KZAW123456');
   await page.fill('[name="hsn"]', '0603');
   await page.fill('[name="tsn"]', 'bgx');
+  // Motor- und Getriebekennbuchstaben (Fassung 29), absichtlich klein und mit
+  // Leerzeichen eingetippt.
+  await page.fill('[name="mkb"]', 'cj xa');
+  await page.fill('[name="gkb"]', 'qdt');
   await page.click('[data-a="ok"]');
   await page.waitForSelector('.head h2');
   ok((await page.textContent('.head h2')) === 'VW Golf', 'Fahrzeug angelegt und Karte sichtbar');
@@ -39,6 +43,16 @@ export default async function ({ browser, base, ok }) {
   ok(/HSN \(zu 2\.1\)\s*0603/.test(karte), 'HSN steht auf der Karte');
   ok(/TSN \(zu 2\.2\)\s*BGX/.test(karte), 'TSN steht auf der Karte, in Großbuchstaben');
   ok(await page.evaluate(() => VEH[IDX[0]].v.tsn) === 'BGX', 'TSN wird in Großbuchstaben gespeichert');
+  ok(/MKB \(Motor\)\s*CJXA/.test(karte), 'MKB steht auf der Karte');
+  ok(/GKB \(Getriebe\)\s*QDT/.test(karte), 'GKB steht auf der Karte');
+  const kb = await page.evaluate(() => ({ m: VEH[IDX[0]].v.mkb, g: VEH[IDX[0]].v.gkb }));
+  ok(kb.m === 'CJXA' && kb.g === 'QDT',
+    `MKB und GKB werden ohne Leerzeichen in Großbuchstaben gespeichert (${kb.m} / ${kb.g})`);
+  // Reihenfolge: die beiden Kürzel stehen direkt nach den Schlüsselnummern.
+  const beschriftungen = await page.evaluate(() =>
+    [...document.querySelectorAll('.stats .stat span')].map(s => s.textContent.trim()));
+  ok(beschriftungen.slice(-4).join(' | ') === 'HSN (zu 2.1) | TSN (zu 2.2) | MKB (Motor) | GKB (Getriebe)',
+    `MKB und GKB stehen nach HSN und TSN (${beschriftungen.slice(-4).join(' | ')})`);
   for (const weg of ['Leistung', 'Hubraum', 'Kraftstoff']) {
     ok(!karte.includes(weg), `${weg} steht nicht mehr auf der Karte`);
   }
@@ -46,6 +60,22 @@ export default async function ({ browser, base, ok }) {
   ok(await page.locator('[name="power"]').count() === 1,
     'Leistung ist in der Bearbeiten-Maske weiterhin erfassbar');
   ok(await page.inputValue('[name="hsn"]') === '0603', 'HSN ist beim Bearbeiten vorbelegt');
+  ok(await page.inputValue('[name="mkb"]') === 'CJXA' && await page.inputValue('[name="gkb"]') === 'QDT',
+    'MKB und GKB sind beim Bearbeiten vorbelegt');
+  // Die Fahrzeugmaske bei 360 px: das neue Feldpaar steht wie die anderen
+  // nebeneinander und läuft nicht über.
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.waitForTimeout(80);
+  const kbPaar = await page.evaluate(() => {
+    const m = document.querySelector('[name="mkb"]'), g = document.querySelector('[name="gkb"]');
+    const a = m.getBoundingClientRect(), b = g.getBoundingClientRect(), p = document.querySelector('#sheet .panel');
+    return { paar: m.parentElement.classList.contains('paar') && m.parentElement === g.parentElement,
+             nebeneinander: Math.abs(a.top - b.top) < 1 && a.right <= b.left,
+             ueberlauf: p.scrollWidth - p.clientWidth };
+  });
+  ok(kbPaar.paar && kbPaar.nebeneinander && kbPaar.ueberlauf <= 0,
+    `MKB und GKB stehen bei 360 px als Paar nebeneinander (Überlauf ${kbPaar.ueberlauf} px)`);
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.click('.panel .row [data-a="close"]');
 
   // --- Aufgeräumte Oberfläche ---

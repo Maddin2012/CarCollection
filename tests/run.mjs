@@ -19,8 +19,9 @@ import * as blatt from './blatt.test.mjs';
 import * as kategorien from './kategorien.test.mjs';
 import * as vorspann from './vorspann.test.mjs';
 import * as installationskarte from './installationskarte.test.mjs';
+import * as garage from './garage.test.mjs';
 
-const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera, vollbild, karte, speicher, logteile, lesen, anhaenge, blatt, kategorien, vorspann, installationskarte];
+const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera, vollbild, karte, speicher, logteile, lesen, anhaenge, blatt, kategorien, vorspann, installationskarte, garage];
 
 const { base, close } = await serve();
 const browser = await launch();

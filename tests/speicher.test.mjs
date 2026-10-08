@@ -55,7 +55,7 @@ export default async function ({ browser, base, ok }) {
       await page.waitForSelector('.head h2');
       const id = await page.evaluate(() => S.id);
       await page.goBack();
-      await page.waitForSelector('.mini, .grid');
+      await page.waitForSelector('.mini, .karussell');
       return id;
     };
     const idA = await anlegen('VW Golf');
@@ -68,15 +68,15 @@ export default async function ({ browser, base, ok }) {
     const p2 = page, fehler2 = errors;
     await leseFehlerFuer(p2, ['akte:v:' + idA]);
     await p2.reload({ waitUntil: 'networkidle' });
-    // Nicht blind auf .grid warten: Fällt die Kennung wieder aus der Liste -
+    // Nicht blind auf .karussell warten: Fällt die Kennung wieder aus der Liste -
     // also genau der Fehler, den diese Reihe sucht -, bleibt ein Fahrzeug
-    // übrig und die App startet auf dessen Karte. Ein Warten auf .grid würde
+    // übrig und die App startet auf dessen Karte. Ein Warten auf .karussell würde
     // dann in einen Zeitablauf laufen und die ganze Reihe abbrechen, statt zu
     // sagen, welche Prüfung umfällt.
-    await p2.waitForSelector('.grid, .head h2');
+    await p2.waitForSelector('.karussell, .head h2');
     if (await p2.locator('.head h2').count()) {
       await p2.goBack();
-      await p2.waitForSelector('.grid, .empty');
+      await p2.waitForSelector('.karussell, .empty');
     }
 
     const idxNach = await p2.evaluate(() => IDX.slice());
@@ -163,7 +163,7 @@ export default async function ({ browser, base, ok }) {
       await saveIndex();
     });
     await page.reload({ waitUntil: 'networkidle' });
-    await page.waitForSelector('.head h2, .grid');
+    await page.waitForSelector('.head h2, .karussell');
     ok(!(await page.evaluate(() => IDX.includes('gibtsnicht'))),
       'Eine echte Waise wird aus der Liste gestrichen');
     ok((await page.locator('.card.mini.tot').count()) === 0,
@@ -291,7 +291,7 @@ export default async function ({ browser, base, ok }) {
       `Die Warnung erscheint${alarm ? '' : ' nicht'}, wenn der Schutz ${wert ? 'besteht' : 'fehlt'}`);
 
     await page.goBack();
-    await page.waitForSelector('.empty, .grid');
+    await page.waitForSelector('.empty, .karussell');
     const hat = await page.evaluate(() => {
       const a = document.getElementById('speicherAlarm');
       return a ? a.textContent : '';
@@ -313,7 +313,7 @@ export default async function ({ browser, base, ok }) {
     await page.click('[data-a="ok"]');
     await page.waitForSelector('.head h2');
     await page.goBack();
-    await page.waitForSelector('.grid');
+    await page.waitForSelector('.karussell');
     ok((await page.textContent('#speicherAlarm')).includes('Noch keine Sicherung'),
       'Ohne Sicherung mahnt die Garage');
 
@@ -332,7 +332,7 @@ export default async function ({ browser, base, ok }) {
     ok(true, 'Nach der Sicherung steht das heutige Datum da');
 
     await page.goBack();
-    await page.waitForSelector('.grid');
+    await page.waitForSelector('.karussell');
     ok((await page.locator('#speicherAlarm').count()) === 0
        || !(await page.textContent('#speicherAlarm')).includes('Sicherung'),
       'Die Mahnung ist weg');
@@ -345,10 +345,10 @@ export default async function ({ browser, base, ok }) {
     await page.reload({ waitUntil: 'networkidle' });
     // Mit genau einem Fahrzeug startet die App auf dessen Karte - dort gibt es
     // keine Garagenhinweise, also erst einen Schritt zurück.
-    await page.waitForSelector('.head h2, .grid');
+    await page.waitForSelector('.head h2, .karussell');
     if (await page.locator('.head h2').count()) {
       await page.goBack();
-      await page.waitForSelector('.grid');
+      await page.waitForSelector('.karussell');
     }
     await page.waitForSelector('#speicherAlarm');
     ok((await page.textContent('#speicherAlarm')).includes('vor 40 Tagen'),

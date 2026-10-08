@@ -94,10 +94,12 @@ export default async function ({ browser, base, ok }) {
     'Kennzeichen steht nicht mehr im Bildbereich');
   ok((await page.textContent('.mini .ms')).includes('M-AB 1234'),
     'Kennzeichen steht in der Textzeile der Karte');
-  ok(await page.locator('#topBtn [data-a="addVehicle"]').count() === 0,
-    'Kein Hinzufügen-Knopf mehr oben in der Garage');
-  ok(await page.locator('.add[data-a="addVehicle"]').count() === 1,
-    'Die große Kachel zum Hinzufügen bleibt');
+  // Seit Fassung 30 umgekehrt: Die Garage wird durchgewischt, und
+  // "Fahrzeug hinzufügen" sitzt als Plus oben neben dem Zahnrad.
+  ok(await page.locator('#topBtn [data-a="addVehicle"]').count() === 1,
+    'Hinzufügen sitzt als Plus oben in der Garage');
+  ok(await page.locator('.add[data-a="addVehicle"]').count() === 0,
+    'Die Kachel zum Hinzufügen gibt es nicht mehr');
 
   // --- Kein seitlicher Überlauf auf einem schmalen Gerät ---
   // Ein umbruchunfähiges Element in der Fahrzeugkarte hat genau das schon

@@ -32,6 +32,8 @@ export default async function ({ browser, base, ok }) {
   // Leerzeichen eingetippt.
   await page.fill('[name="mkb"]', 'cj xa');
   await page.fill('[name="gkb"]', 'qdt');
+  // Farbcode (Fassung 32): frei, mit Leerzeichen am Rand eingetippt.
+  await page.fill('[name="farbe"]', '  LC9X Deep Black  ');
   await page.click('[data-a="ok"]');
   await page.waitForSelector('.head h2');
   ok((await page.textContent('.head h2')) === 'VW Golf', 'Fahrzeug angelegt und Karte sichtbar');
@@ -51,8 +53,12 @@ export default async function ({ browser, base, ok }) {
   // Reihenfolge: die beiden Kürzel stehen direkt nach den Schlüsselnummern.
   const beschriftungen = await page.evaluate(() =>
     [...document.querySelectorAll('.stats .stat span')].map(s => s.textContent.trim()));
-  ok(beschriftungen.slice(-4).join(' | ') === 'HSN (zu 2.1) | TSN (zu 2.2) | MKB (Motor) | GKB (Getriebe)',
-    `MKB und GKB stehen nach HSN und TSN (${beschriftungen.slice(-4).join(' | ')})`);
+  ok(beschriftungen.slice(-5).join(' | ') === 'HSN (zu 2.1) | TSN (zu 2.2) | MKB (Motor) | GKB (Getriebe) | Farbcode',
+    `MKB, GKB und der Farbcode stehen nach HSN und TSN (${beschriftungen.slice(-5).join(' | ')})`);
+  ok(/Farbcode\s*LC9X Deep Black/.test(karte), 'Der Farbcode steht auf der Karte');
+  const farbe = await page.evaluate(() => VEH[IDX[0]].v.farbe);
+  ok(farbe === 'LC9X Deep Black',
+    `Der Farbcode wird ohne Ränder, aber in seiner Schreibweise gespeichert (${JSON.stringify(farbe)})`);
   for (const weg of ['Leistung', 'Hubraum', 'Kraftstoff']) {
     ok(!karte.includes(weg), `${weg} steht nicht mehr auf der Karte`);
   }
@@ -62,6 +68,7 @@ export default async function ({ browser, base, ok }) {
   ok(await page.inputValue('[name="hsn"]') === '0603', 'HSN ist beim Bearbeiten vorbelegt');
   ok(await page.inputValue('[name="mkb"]') === 'CJXA' && await page.inputValue('[name="gkb"]') === 'QDT',
     'MKB und GKB sind beim Bearbeiten vorbelegt');
+  ok(await page.inputValue('[name="farbe"]') === 'LC9X Deep Black', 'Der Farbcode ist beim Bearbeiten vorbelegt');
   // Die Fahrzeugmaske bei 360 px: das neue Feldpaar steht wie die anderen
   // nebeneinander und läuft nicht über.
   await page.setViewportSize({ width: 360, height: 780 });
@@ -113,6 +120,25 @@ export default async function ({ browser, base, ok }) {
   await page.waitForSelector('.head h2');
   await page.waitForTimeout(120);
   ok(await passtInsFenster(), 'Fahrzeugkarte scrollt bei 360 px nicht seitlich');
+  // Der Farbcode darf 40 Zeichen lang sein - auch ohne ein einziges
+  // Leerzeichen, an dem er umbrechen könnte.
+  const farbeVorher = await page.evaluate(() => S.v.farbe);
+  for (const lang of ['LC9X Deep Black Perleffekt Sonderlack 1A', 'LC9XDEEPBLACKPERLEFFEKTSONDERLACKNUMMER1']) {
+    await page.evaluate(w => { S.v.farbe = w; render(); }, lang);
+    await page.waitForTimeout(80);
+    ok(await passtInsFenster(), `Ein Farbcode mit 40 Zeichen läuft bei 360 px nicht über (${lang.includes(' ') ? 'mit' : 'ohne'} Leerzeichen)`);
+    // Die Karte schneidet ab, was übersteht - "passt ins Fenster" allein sagt
+    // also nicht, ob der Text ganz zu sehen ist. Deshalb am Wert selbst
+    // gemessen, und dass er nicht an die Beschriftung stößt.
+    const z = await page.evaluate(() => {
+      const st = [...document.querySelectorAll('.stats .stat')].find(x => x.querySelector('span').textContent === 'Farbcode');
+      if (!st) return { abstand: -1, ganz: false };   // fehlt die Zeile, rot statt Abbruch
+      const sp = st.querySelector('span').getBoundingClientRect(), b = st.querySelector('b');
+      return { abstand: Math.round(b.getBoundingClientRect().left - sp.right), ganz: b.scrollWidth <= b.clientWidth && b.getBoundingClientRect().right <= st.getBoundingClientRect().right + 0.5 };
+    });
+    ok(z.ganz && z.abstand >= 8, `Er ist ganz zu sehen und hält Abstand zur Beschriftung (${z.abstand} px)`);
+  }
+  await page.evaluate(w => { S.v.farbe = w; render(); }, farbeVorher);
 
   // --- Die untere Leiste (Fassung 17) ---
   // Gemessen wird die Breite des Beschriftungstexts selbst, nicht scrollWidth

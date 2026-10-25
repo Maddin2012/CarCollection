@@ -258,6 +258,8 @@ input.upper{text-transform:uppercase}
 .dlist .d button{flex:none;background:none;border:0;color:var(--muted);padding:5px 6px;line-height:0}
 .dlist .d button svg{display:block;width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
 .dhint{color:var(--muted);font-size:12px;margin:8px 2px 0}
+/* Mehrere Dateien in der Dokument-Maske: Titel direkt in der Zeile. */
+.dlist .d .dtitel{flex:1;min-width:0;margin:0;padding:8px 10px;font-size:14px}
 /* Titelbild in der Bearbeiten-Maske: Vorschau im selben Seitenverhältnis wie
    auf der Karte, damit man vor dem Speichern sieht, was ankommt. */
 /* Ein Fahrzeug, dessen Datensatz sich nicht lesen ließ: sichtbar vorhanden,
@@ -335,7 +337,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',mkb:'',gkb:'',farbe:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='34';
+const APP_VERSION='35';
 let S=null, VEH={}, IDX=[], view='garage';
 // Das Fahrzeug, bei dem das Garagen-Karussell zuletzt stand. Wer ein Fahrzeug
 // öffnet und zurückgeht, landet wieder dort und nicht beim ersten.
@@ -1204,7 +1206,11 @@ async function hydrateImages(){
 }
 
 /* ---------- Sheet ---------- */
-let sheetSave=null, sheetDel=null, pending=null, pendingDoc=null;
+let sheetSave=null, sheetDel=null, pendingDoc=null;
+/* Die Dateien der Dokument-Maske, je eine wird ein eigenes Dokument
+   (Fassung 35; vorher genau eine, ein zweiter Scan ersetzte den ersten still).
+   titel: was in der Maske dafür steht. */
+let pendingDocs=[];   // [{tmp,data,type,datei,titel}]
 /* ---------- Navigation über die History ----------
    Die Wischgeste des Handys soll einen Schritt zurückgehen, nicht die App
    schließen. Dafür bekommt jede Ebene einen eigenen History-Eintrag:
@@ -1248,12 +1254,12 @@ function replaceModalWith(){
    Leseblatt eines Logbuch-Eintrags. Die übrigen Aufrufe lassen ihn weg. */
 function openSheet(title,body,onSave,del,kopf){
   pushModal('sheet');
-  sheetSave=onSave; sheetDel=del||null; pending=null;
+  sheetSave=onSave; sheetDel=del||null; pendingDocs=[]; zuschnittReihe=[];
   $('#sheet').innerHTML=`<div class="scrim" data-a="close"></div><div class="panel" role="dialog" aria-label="${esc(title)}"><div class="grab"></div><div class="shead"><h2>${esc(title)}</h2>${kopf||''}</div><div id="sbody">${body}</div><div class="err" id="err"></div>
   <div class="row">${del?'<button class="btn ghost danger" data-a="del">Löschen</button>':''}<button class="btn ghost" data-a="close">${onSave?'Abbrechen':'Schließen'}</button>${onSave?'<button class="btn primary" data-a="ok">Speichern</button>':''}</div></div>`;
   $('#sheet').classList.add('open');
 }
-const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pending=pendingDoc=anhaenge=logParts=pendingCover=null;};
+const closeSheet=()=>{$('#sheet').classList.remove('open');$('#sheet').innerHTML='';sheetSave=sheetDel=pendingDoc=anhaenge=logParts=pendingCover=null;pendingDocs=[];zuschnittReihe=[];};
 /* Sammelt die Felder der offenen Maske ein. Felder in einem Nebenformular -
    etwa dem für ein neues Teil am Logbuch-Eintrag - bleiben ausdrücklich
    draußen: Sonst klebten sie über Object.assign still am Datensatz und fielen
@@ -1325,13 +1331,57 @@ function docAufnehmen(r,dateiname){
     anhaenge.add.push({tmp:uid(),data:r.data,type:r.type,datei:dateiname,art:anhangArt});
     renderAnhaenge(); showErr('');
   }else{
-    pending=r;
-    const fn=$('#fname'); if(fn) fn.textContent='Ausgewählt: '+dateiname;
-    showErr('');
+    // Dokument-Maske: anhängen. Der Titel ist zunächst der Dateiname.
+    dokTitelLesen();
     const ti=document.querySelector('#sbody [name=title]');
-    if(ti&&!ti.value) ti.value=dateiname.replace(/\.[^.]+$/,'');
+    const titel=!pendingDocs.length&&ti&&ti.value.trim()?ti.value:dateiname.replace(/\.[^.]+$/,'');
+    pendingDocs.push({tmp:uid(),data:r.data,type:r.type,datei:dateiname,titel});
+    renderDokListe(); showErr('');
   }
 }
+/* Was in den Titelfeldern steht, zurück in pendingDocs - vor jedem Neuzeichnen
+   und vor dem Speichern, sonst ginge Getipptes verloren. */
+function dokTitelLesen(){
+  const ti=document.querySelector('#sbody [name=title]');
+  if(pendingDocs.length===1&&ti) pendingDocs[0].titel=ti.value;
+  for(const el of document.querySelectorAll('#dokListe [data-tmp]')){
+    const p=pendingDocs.find(x=>x.tmp===el.dataset.tmp); if(p) p.titel=el.value;
+  }
+}
+/* Eine Datei: wie bisher ein Titelfeld. Ab zwei steht jede Datei in einer
+   Liste mit eigenem Titel und ✕; das einzelne Feld tritt zurück. */
+function renderDokListe(){
+  const box=$('#dokListe'), fn=$('#fname'), ein=$('#titelEinzeln'); if(!box) return;
+  const n=pendingDocs.length;
+  if(fn) fn.textContent=n===0?'':n===1?'Ausgewählt: '+pendingDocs[0].datei:n+' Dateien ausgewählt';
+  if(ein) ein.hidden=n>1;
+  if(n===1){ const ti=document.querySelector('#sbody [name=title]'); if(ti) ti.value=pendingDocs[0].titel; }
+  box.innerHTML=n>1?pendingDocs.map((p,i)=>`<div class="d"><div class="ic">${p.type==='pdf'?'PDF':'DOK'}</div>
+    <input class="dtitel" data-nebenform data-tmp="${p.tmp}" value="${esc(p.titel)}" aria-label="Titel für Datei ${i+1}" placeholder="Titel">
+    <button data-a="dokWeg" data-id="${p.tmp}" aria-label="Datei entfernen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button></div>`).join(''):'';
+}
+/* ---------- Mehrere Bilder nacheinander durch den Zuschnitt ----------
+   Immer nur einer offen: Der nächste öffnet sich erst, wenn popstate den
+   vorigen geschlossen hat - gleich ob übernommen oder abgebrochen. Ein
+   abgebrochenes Bild fällt allein weg. */
+let zuschnittReihe=[];   // [{datei,nr,von}]
+let reiheLaeuft=false;
+async function weiterZuschneiden(){
+  if(reiheLaeuft||E||!zuschnittReihe.length) return;
+  const n=zuschnittReihe.shift();
+  reiheLaeuft=true;
+  try{
+    const c=await fileToCanvas(n.datei,2000);
+    // Inzwischen geschlossen? Dann nichts mehr öffnen.
+    if(!$('#sheet').classList.contains('open')) return;
+    openEdit(c,r=>docAufnehmen(r,n.datei.name));
+    E.nr=n.nr; E.von=n.von; renderEdit();
+  }catch(err){
+    showErr(n.datei.name+': '+(err.message||'Die Datei konnte nicht gelesen werden.'));
+  }finally{ reiheLaeuft=false; }
+  if(!E) weiterZuschneiden();
+}
+const eNr=()=>E&&E.von>1?'Bild '+E.nr+' von '+E.von+' · ':'';
 
 /* ---------- Titelbild in der Bearbeiten-Maske ----------
    Gehalten wird es nur, solange die Maske offen ist; geschrieben wird erst
@@ -1641,11 +1691,11 @@ function renderAnhaenge(){
    beschriftete Blöcke statt vier Knöpfen in einer Reihe: Bei 360 px Breite
    wäre eine Viererreihe nicht mehr lesbar. */
 const anhangFeld=hinweis=>`<label>Dokumente</label>
-   <div class="filebox"><button class="btn" data-a="pickCam">Scannen</button><button class="btn" data-a="pickFile">Datei wählen</button></div>
+   <div class="filebox"><button class="btn" data-a="pickCam">Scannen</button><button class="btn" data-a="pickFile">Dateien wählen</button></div>
    <label>Bilder</label>
-   <div class="filebox"><button class="btn" data-a="pickFotoCam">Foto aufnehmen</button><button class="btn" data-a="pickFotoFile">Bild wählen</button></div>
+   <div class="filebox"><button class="btn" data-a="pickFotoCam">Foto aufnehmen</button><button class="btn" data-a="pickFotoFile">Bilder wählen</button></div>
    <input type="file" id="fCam" accept="image/*" capture="environment" hidden>
-   <input type="file" id="fPick" accept="image/*,application/pdf" hidden>
+   <input type="file" id="fPick" accept="image/*,application/pdf" multiple hidden>
    <div class="dlist" id="anhaenge"></div>
    <p class="dhint">${hinweis}</p>`;
 
@@ -2016,7 +2066,7 @@ function renderEdit(){
   }else if(E.stufe==='crop'){
     l.innerHTML=`<div class="ebar">
         <button class="btn ghost ico" data-a="editAb" aria-label="Abbrechen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button>
-        <div class="et"><b>Zuschneiden</b><span>Ecken auf die Blattkanten ziehen</span></div>
+        <div class="et"><b>Zuschneiden</b><span>${eNr()}Ecken auf die Blattkanten ziehen</span></div>
         <button class="btn ghost ico" data-a="editDrehen" aria-label="Drehen"><svg viewBox="0 0 24 24">${ICONS.rot}</svg></button>
       </div>
       <div class="estage"><div class="ewrap" id="ewrap"></div></div>
@@ -2035,7 +2085,7 @@ function renderEdit(){
     // Stufe "ergebnis" - E.ergebnis steht hier immer, editUeber setzt es vorher.
     l.innerHTML=`<div class="ebar">
         <button class="btn ghost ico" data-a="editZurueck" aria-label="Zurück zum Zuschneiden"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button>
-        <div class="et"><b>Ergebnis</b><span>${E.ergebnis.width} × ${E.ergebnis.height} Punkte</span></div>
+        <div class="et"><b>Ergebnis</b><span>${eNr()}${E.ergebnis.width} × ${E.ergebnis.height} Punkte</span></div>
         <span style="width:37px"></span>
       </div>
       <div class="estage"><div class="ewrap" id="ewrap"></div></div>
@@ -2584,19 +2634,34 @@ const A={
 
   addDoc:()=>{
     openSheet('Dokument hinzufügen',
-      `<div class="filebox"><button class="btn" data-a="pickCam">Scannen</button><button class="btn" data-a="pickFile">Datei wählen</button></div><div class="fname" id="fname"></div>
+      `<div class="filebox"><button class="btn" data-a="pickCam">Scannen</button><button class="btn" data-a="pickFile">Dateien wählen</button></div><div class="fname" id="fname"></div>
        <input type="file" id="fCam" accept="image/*" capture="environment" hidden>
-       <input type="file" id="fPick" accept="image/*,application/pdf" hidden>`+
-      field('Titel','title','','text','placeholder="z. B. TÜV-Gutachten 2026"')+
-      `<div class="two paar">${select('Kategorie','category',DOCCATS,'Fahrzeugpapiere')}${field('Datum','date',today(),'date')}</div>`,
+       <input type="file" id="fPick" accept="image/*,application/pdf" multiple hidden>
+       <div class="dlist" id="dokListe"></div>
+       <div id="titelEinzeln">${field('Titel','title','','text','placeholder="z. B. TÜV-Gutachten 2026"')}</div>`+
+      // Ist oben eine Kategorie gefiltert, ist sie hier gleich gewählt.
+      `<div class="two paar">${select('Kategorie','category',DOCCATS,(window._df&&window._df!=='Alle'&&DOCCATS.includes(window._df))?window._df:'Fahrzeugpapiere')}${field('Datum','date',today(),'date')}</div>`,
       async()=>{
-        const o=vals(); if(!pending) return showErr('Bitte zuerst ein Dokument scannen oder auswählen.');
-        if(!o.title) return showErr('Bitte einen Titel eintragen.');
-        const id=uid();
-        const ok=await store.set('img:'+id,pending.data);
-        if(!ok) return showErr('Speichern fehlgeschlagen. Die Datei ist evtl. zu groß.');
-        IMG['img:'+id]=pending.data;
-        S.docs.push({id,type:pending.type,...o}); await save(); dismissModal();
+        dokTitelLesen();
+        const o=vals(); delete o.title;
+        if(!pendingDocs.length) return showErr('Bitte zuerst ein Dokument scannen oder auswählen.');
+        if(pendingDocs.some(p=>!p.titel.trim()))
+          return showErr(pendingDocs.length>1?'Bitte für jede Datei einen Titel eintragen.':'Bitte einen Titel eintragen.');
+        // Erst alle Dateien schreiben. Scheitert eine, kommen die in diesem
+        // Durchgang geschriebenen wieder weg - nichts verweist auf sie - und
+        // es entsteht kein Dokument.
+        const geschrieben=[];
+        for(const p of pendingDocs){
+          const id=uid();
+          if(!await store.set('img:'+id,p.data)){
+            for(const w of geschrieben){ await store.del('img:'+w); delete IMG['img:'+w]; }
+            return showErr(pendingDocs.length>1?'Speichern fehlgeschlagen bei „'+p.datei+'“. Die Datei ist evtl. zu groß. Es wurde nichts angelegt.'
+              :'Speichern fehlgeschlagen. Die Datei ist evtl. zu groß.');
+          }
+          IMG['img:'+id]=p.data; geschrieben.push(id); p.id=id;
+        }
+        for(const p of pendingDocs) S.docs.push({id:p.id,type:p.type,title:p.titel.trim(),...o});
+        await save(); dismissModal();
       });
   },
   /* Die App nimmt selbst auf. docAufnehmen liest anhaenge und anhangArt erst
@@ -2606,6 +2671,7 @@ const A={
      Dokument und Bild gehen durch denselben Zuschnitt; unterschiedlich ist
      allein die Kategorie am Ende. Beim Bild lässt die Dateiauswahl nur Bilder
      zu - eine PDF wäre dort kein Bild. */
+  dokWeg:d=>{ dokTitelLesen(); pendingDocs=pendingDocs.filter(p=>p.tmp!==d.id); renderDokListe(); },
   pickCam:()=>{ anhangArt='dok'; openKamera(r=>docAufnehmen(r,'Aufnahme-'+today()+'.jpg')) },
   pickFile:()=>{ anhangArt='dok'; const i=$('#fPick'); i.accept='image/*,application/pdf'; i.click() },
   pickFotoCam:()=>{ anhangArt='foto'; openKamera(r=>docAufnehmen(r,'Foto-'+today()+'.jpg')) },
@@ -2728,7 +2794,7 @@ addEventListener('popstate',e=>{
   if(st.s==='modal'){
     const verlassen=modalStack.pop();
     if(verlassen==='full') closeFull();
-    else if(verlassen==='edit') closeEdit();
+    else if(verlassen==='edit'){ closeEdit(); weiterZuschneiden(); }
     else if(verlassen==='aus') closeAus();
     else closeSheet();
     return;
@@ -2770,17 +2836,20 @@ document.addEventListener('change',async e=>{
     }catch(err){ alert(err.message||'Die Datei konnte nicht gelesen werden.') }
   }
   if((t.id==='fCam'||t.id==='fPick')&&t.files[0]){
-    const datei=t.files[0];
-    // Zurücksetzen, sonst meldet sich dieselbe Datei beim zweiten Mal nicht.
+    // Seit Fassung 35 auch mehrere auf einmal. Zurücksetzen, sonst meldet
+    // sich dieselbe Datei beim zweiten Mal nicht.
+    const dateien=[...t.files];
     t.value='';
-    try{
-      if(datei.type==='application/pdf'){ docAufnehmen(await fileToData(datei,1600),datei.name); }
-      else{
-        // Bilder gehen durch den Zuschnitt - ein abfotografiertes Blatt ist
-        // schief, gleich ob es von der Kamera oder aus der Galerie kommt.
-        openEdit(await fileToCanvas(datei,2000),r=>docAufnehmen(r,datei.name));
-      }
-    }catch(err){showErr(err.message)}
+    // PDFs gleich übernehmen. Bilder gehen durch den Zuschnitt - ein
+    // abfotografiertes Blatt ist schief, gleich ob es von der Kamera oder aus
+    // der Galerie kommt -, mehrere der Reihe nach.
+    const bilder=dateien.filter(d=>d.type!=='application/pdf');
+    for(const datei of dateien.filter(d=>d.type==='application/pdf')){
+      try{ docAufnehmen(await fileToData(datei,1600),datei.name); }
+      catch(err){ showErr(datei.name+': '+(err.message||'Die Datei konnte nicht gelesen werden.')); }
+    }
+    bilder.forEach((datei,i)=>zuschnittReihe.push({datei,nr:i+1,von:bilder.length}));
+    weiterZuschneiden();
   }
 });
 

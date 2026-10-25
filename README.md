@@ -89,7 +89,20 @@ App belegt, sagt die App den Grund und bietet den Weg über die Kamera-App des
 Geräts als Rückfallebene an. Der Auslöser ist erst dann freigegeben, wenn
 wirklich ein Bild läuft — ein Tipp darauf geht nie ins Leere.
 
-Über *Datei wählen* kommt ein schon vorhandenes Bild oder eine PDF herein.
+Über *Dateien wählen* kommen schon vorhandene Bilder oder PDFs herein, **auch
+mehrere auf einmal** (in der Dateiauswahl lange drücken und weitere antippen).
+Jede Datei wird ein eigenes Dokument. Ab zwei Dateien steht in der Maske eine
+Liste: jede Datei mit eigenem Titel (vorbelegt mit dem Dateinamen) und einem ✕
+zum Entfernen; Kategorie und Datum gelten für alle. Ein weiterer Scan oder eine
+weitere Auswahl kommt dazu, statt das schon Gewählte zu ersetzen. Mehrere Fotos
+gehen **der Reihe nach** durch den Zuschnitt, oben steht „Bild 2 von 3“. Wer
+eines abbricht, verliert nur dieses, das nächste kommt. Gespeichert wird alles
+oder nichts: Lässt sich eine Datei nicht ablegen, entsteht kein Dokument, und
+schon Geschriebenes wird wieder entfernt.
+
+**Kategorie aus dem Filter.** Ist oben im Reiter Dokumente ein Filter gewählt,
+etwa *Fahrwerk*, steht diese Kategorie in der Maske schon drin. Bei *Alle* ist
+es wie bisher *Fahrzeugpapiere*.
 
 **Zweite Stufe – Zuschneiden.** Vier Griffe liegen auf den Bildkanten; du ziehst
 sie auf die Ecken des Blattes. Die App rechnet daraus die perspektivische
@@ -260,16 +273,17 @@ Zeilen:
 
 | | |
 | --- | --- |
-| **Dokumente** | *Scannen* · *Datei wählen* |
-| **Bilder** | *Foto aufnehmen* · *Bild wählen* |
+| **Dokumente** | *Scannen* · *Dateien wählen* |
+| **Bilder** | *Foto aufnehmen* · *Bilder wählen* |
 
 Beides geht durch denselben Zuschnitt — Ecken ziehen, drehen, Dokument-Modus
 (der ist standardmäßig aus). Wer nichts ändern will, tippt zweimal weiter.
 Unterschiedlich ist allein, **wie der Anhang einsortiert wird**: Ein Dokument
 landet unter *Rechnungen*, ein Bild unter der Kategorie **Fotos**.
 
-Bei *Bild wählen* lässt die Dateiauswahl nur Bilder zu; bei *Datei wählen* auch
-PDFs.
+Bei *Bilder wählen* lässt die Dateiauswahl nur Bilder zu; bei *Dateien wählen*
+auch PDFs. Beide nehmen mehrere auf einmal, die Bilder gehen nacheinander durch
+den Zuschnitt.
 
 **Ein Bild ist technisch ein Dokument.** Es liegt in derselben Liste, trägt nur
 eine andere Kategorie. Daraus folgt zweierlei: Es erscheint auch im Reiter
@@ -288,7 +302,7 @@ verlieren nur den Bezug.
 ## Belege am Logbuch-Eintrag
 
 In der Maske eines Logbuch-Eintrags gibt es unten einen Bereich **Dokumente**
-mit denselben Knöpfen wie im Reiter Dokumente: *Scannen* oder *Datei wählen*,
+mit denselben Knöpfen wie im Reiter Dokumente: *Scannen* oder *Dateien wählen*,
 beliebig oft. Angehängt wird erst beim Speichern — brichst du ab, bleibt nichts
 zurück.
 
@@ -471,6 +485,7 @@ die App:
 | `installationskarte` | QR-Code der Karte in `karte/` führt auf die Adresse aus `CLAUDE.md`; PDF mit einer Seite; die Verweise der README gehen nicht ins Leere |
 | `garage` | Karussell der Garage: Karten nebeneinander, im Hochformat und bis unten, Bild füllt die Karte, Höhe folgt dem Fenster, Nachbar lugt herein, Einrasten nach einer Scroll-Geste, Punkte, gemerkte Stelle nach Öffnen und Zurück, Plus oben, Platzhalter, ein Fahrzeug, leere Garage. Touch-Gesten kommen im Testbrowser nicht an – geprüft ist das Scrollen, nicht der Finger |
 | `titelbild` | Ausschnitt des Titelbilds: öffnet nach der Auswahl, Ziehen mit Klemmen, zwei Finger mit stehendem Anker, ganz heraus mit unscharfem Rand, gespeicherter Bereich gleich dem gewählten, Garage zeigt ihn an derselben Stelle, Fahrzeugkarte ganz über dem Namen, Hochkant-Foto verkleinert über den Namen geschoben, Panorama und hohe Streifen rechnerisch, Name und Kennzeichen im Ausschnitt, Lage aus Fassung 33, nachträglich ohne das Bild neu zu schreiben, Zurück-Geste, Abbrechen, ältere Fahrzeuge, Sicherung, 360 px |
+| `mehrfach` | Mehrere Dateien auf einmal: Auswahl mit `multiple`, Fotos nacheinander im Zuschnitt mit „Bild n von m“, Zurück-Geste lässt nur ein Foto weg, Liste mit Titel je Datei, leerer Titel, Speicherfehler räumt auf, Entfernen, zurück auf eine Datei, Kategorie aus dem Filter (Fahrwerk, Alle, Fotos), mehrere Anhänge am Logbuch-Eintrag, 360 px |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter

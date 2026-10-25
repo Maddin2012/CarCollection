@@ -260,6 +260,21 @@ input.upper{text-transform:uppercase}
 .card.mini.tot .mh b{color:var(--warn)}
 .card.mini.tot .ms{color:var(--muted);font-size:12px}
 .cbox{margin-top:6px;aspect-ratio:4/3;border-radius:12px;border:1px solid var(--line);background:var(--bg) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
+/* Ausschnitt des Titelbilds (Fassung 33). Das Foto bleibt unverändert; die
+   Lage {x,y,z} am Fahrzeug sagt, welcher Bildpunkt in der Mitte steht und wie
+   weit gezoomt ist. Der Rahmen trägt das Bild weiter selbst (bildfüllend) -
+   darüber liegt ein Weichzeichner, darüber das scharfe Bild in seiner Lage.
+   Ist es herausgezoomt, füllt die unscharfe, abgedunkelte Kopie den Rand. */
+.cbox{position:relative;overflow:hidden}
+.bildlage{position:absolute;inset:0;background-repeat:no-repeat;pointer-events:none;border-radius:inherit}
+.mitlage{background-color:transparent}
+.mitlage::before{content:'';position:absolute;inset:0;-webkit-backdrop-filter:blur(18px) brightness(.5);backdrop-filter:blur(18px) brightness(.5);border-radius:inherit;pointer-events:none}
+#ausschnitt{position:fixed;inset:0;z-index:45;background:#070A10;display:flex;flex-direction:column}
+#ausschnitt[hidden]{display:none}
+.astage{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:14px;touch-action:none;overflow:hidden}
+.arahmen{position:relative;flex:none;border-radius:20px;overflow:hidden;background:var(--surface2) center/cover no-repeat;box-shadow:0 0 0 2px var(--foil1);touch-action:none;cursor:grab}
+.avor{flex:none;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}
+.avorbild{position:relative;width:112px;aspect-ratio:4/3;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--surface2) center/cover no-repeat}
 
 /* Einstellungen */
 .sect{border:1px solid var(--line);background:var(--surface);border-radius:16px;padding:14px 16px 16px;margin-bottom:14px}
@@ -282,6 +297,7 @@ input.upper{text-transform:uppercase}
 <div id="sheet"></div>
 <div id="full" hidden></div>
 <div id="edit" hidden></div>
+<div id="ausschnitt" hidden></div>
 <input type="file" id="coverIn" accept="image/*" hidden>
 <input type="file" id="backupIn" accept=".txt,.json,text/plain,application/json" hidden>
 
@@ -312,7 +328,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',mkb:'',gkb:'',farbe:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='32';
+const APP_VERSION='33';
 let S=null, VEH={}, IDX=[], view='garage';
 // Das Fahrzeug, bei dem das Garagen-Karussell zuletzt stand. Wer ein Fahrzeug
 // öffnet und zurückgeht, landet wieder dort und nicht beim ersten.
@@ -827,9 +843,18 @@ function karussellHoehe(){
   const oben=k.getBoundingClientRect().top+window.scrollY+parseFloat(cs.paddingTop);
   const unten=parseFloat(cs.paddingBottom)+($('#punkte')?20:0)+16;
   const frei=innerHeight-oben-unten;
-  k.style.setProperty('--karte-h',Math.round(Math.min(breite*2.1,Math.max(breite*1.25,frei)))+'px');
+  const hoehe=Math.round(Math.min(breite*2.1,Math.max(breite*1.25,frei)));
+  k.style.setProperty('--karte-h',hoehe+'px');
+  garageMass={w:breite,h:hoehe};
 }
-addEventListener('resize',()=>{ if(view==='garage') karussellHoehe(); });
+// Die Lage des Titelbilds hängt an den Rahmenmaßen - nach einer Größenänderung
+// also neu setzen.
+addEventListener('resize',()=>{
+  if(view==='garage'){ karussellHoehe(); hydrateImages(); }
+  else if(view==='vehicle'&&tab==='card') hydrateImages();
+  if(AS){ ausPassen(); ausZeichnen(); }
+  renderCoverBox();
+});
 function karussellEinrichten(){
   const k=$('#karussell'); if(!k) return;
   karussellHoehe();
@@ -1150,13 +1175,13 @@ async function hydrateImages(){
   if(view==='garage'){
     for(const el of document.querySelectorAll('[data-cover]')){
       const x=VEH[el.dataset.cover];
-      if(x&&x.cover){const d=await loadImg(coverKey(x.id)); if(d) el.style.backgroundImage=`url(${d})`;}
+      if(x&&x.cover){const d=await loadImg(coverKey(x.id)); if(d) bildLage(el,d,x.coverLage,true);}
     }
     return;
   }
   if(tab==='card'&&S.cover){
     const d=await loadImg(coverKey(S.id)); const b=$('#coverBox');
-    if(d&&b) b.style.backgroundImage=`url(${d})`;
+    if(d&&b) bildLage(b,d,S.coverLage,false);
   }
   if(tab==='doc'){
     for(const el of document.querySelectorAll('[data-thumb]')){
@@ -1195,13 +1220,13 @@ function pushModal(art){
    Eintrag im Stapel stehen und die Geste liefe einmal ins Leere. */
 function dismissModal(){
   if(modalStack.length) history.back();   // schließen und zeichnen erledigt popstate
-  else { closeEdit(); closeFull(); closeSheet(); render(); }
+  else { closeAus(); closeEdit(); closeFull(); closeSheet(); render(); }
 }
 /* Für die Fälle, in denen das Schließen zugleich den Bildschirm wechselt:
    Der Modal-Eintrag wird durch den neuen Bildschirm ersetzt, statt ihn
    zurückzunehmen - sonst landete man auf dem alten Bildschirm. */
 function replaceModalWith(){
-  closeEdit(); closeFull(); closeSheet();
+  closeAus(); closeEdit(); closeFull(); closeSheet();
   modalStack=[];
   syncScreen();
   render();
@@ -1307,10 +1332,172 @@ function renderCoverBox(){
   const neu=pendingCover.data;
   const alt=!pendingCover.weg&&!neu&&IMG[coverKey(pendingCover.id)];
   const bild=neu||alt;
-  box.style.backgroundImage=bild?`url(${bild})`:'';
-  box.textContent=bild?'':'Kein Titelbild';
+  if(bild){ box.textContent=''; bildLage(box,bild,coverLageAktuell(),false); }
+  else { lageWeg(box); box.textContent='Kein Titelbild'; }
   const raus=$('#coverOff'); if(raus) raus.hidden=!bild;
+  const aus=$('#coverLageBtn'); if(aus) aus.hidden=!bild;
 }
+// Die Lage, die in der Maske gerade gilt: eben eingestellt, sonst bei einem
+// neu gewählten Bild die Mitte, sonst die gespeicherte.
+function coverLageAktuell(){
+  if(!pendingCover) return LAGE0;
+  if(pendingCover.lage) return pendingCover.lage;
+  if(pendingCover.data) return LAGE0;
+  const x=VEH[pendingCover.id]; return (x&&x.coverLage)||LAGE0;
+}
+
+/* ---------- Ausschnitt des Titelbilds (Fassung 33) ----------
+   Gespeichert wird nicht ein zugeschnittenes Bild, sondern die Lage
+   {x, y, z}: x/y ist der Bildpunkt (0..1), der in der Mitte des Rahmens steht,
+   z der Zoom gegenüber "bildfüllend". So bleibt das Foto unverändert, lässt
+   sich jederzeit neu einstellen, und ein Wert passt auf beide Rahmen - die
+   hohe Garagen-Karte und den 4:3-Rahmen der Fahrzeugkarte. Fahrzeuge ohne
+   Lage zeigen wie bisher die bildfüllende Mitte. */
+const LAGE0={x:.5,y:.5,z:1};
+const LAGE_ZMAX=4;
+const zahl=(v,d)=>typeof v==='number'&&isFinite(v)?v:d;
+const lageNorm=l=>({x:Math.min(1,Math.max(0,zahl(l&&l.x,.5))),y:Math.min(1,Math.max(0,zahl(l&&l.y,.5))),z:Math.max(.01,zahl(l&&l.z,1))});
+const BILDMASS=new Map();
+function bildMass(data){
+  const k=data.length+':'+data.slice(-80);
+  if(!BILDMASS.has(k)) BILDMASS.set(k,new Promise((res,rej)=>{
+    const i=new Image(); i.onload=()=>res({w:i.naturalWidth,h:i.naturalHeight}); i.onerror=rej; i.src=data;
+  }));
+  return BILDMASS.get(k);
+}
+/* Bild w×h im Rahmen W×H: Maßstab aus "bildfüllend" mal Zoom, nie kleiner als
+   "ganz sichtbar". Ohne Rand (rand=false, Fahrzeugkarte) nie unter
+   bildfüllend. Dann den Bildpunkt in die Mitte und klemmen: Ist das Bild
+   größer als der Rahmen, bleibt kein Rand frei; ist es kleiner, steht es
+   mittig. */
+function lageRechnen(w,h,W,H,lage,rand){
+  const L=lageNorm(lage), cover=Math.max(W/w,H/h), contain=Math.min(W/w,H/h);
+  const z=Math.min(LAGE_ZMAX,rand?L.z:Math.max(1,L.z));
+  const s=Math.max(contain,cover*z), dw=w*s, dh=h*s;
+  let x=W/2-L.x*dw, y=H/2-L.y*dh;
+  x=dw>=W?Math.min(0,Math.max(W-dw,x)):(W-dw)/2;
+  y=dh>=H?Math.min(0,Math.max(H-dh,y)):(H-dh)/2;
+  return {dw,dh,x,y,s,cover,contain};
+}
+function lageAnwenden(el,data,m,lage,rand){
+  const W=el.clientWidth, H=el.clientHeight; if(!W||!H||!m.w||!m.h) return null;
+  let L=el.querySelector(':scope>.bildlage');
+  if(!L){ L=document.createElement('i'); L.className='bildlage'; el.prepend(L); }
+  const g=lageRechnen(m.w,m.h,W,H,lage,rand);
+  el.style.backgroundImage=`url(${data})`; el.classList.add('mitlage');
+  if(L.dataset.quelle!==data.slice(-80)){ L.style.backgroundImage=`url(${data})`; L.dataset.quelle=data.slice(-80); }
+  L.style.backgroundSize=`${g.dw}px ${g.dh}px`;
+  L.style.backgroundPosition=`${g.x}px ${g.y}px`;
+  return g;
+}
+async function bildLage(el,data,lage,rand){
+  if(!el||!data) return null;
+  try{ return lageAnwenden(el,data,await bildMass(data),lage,rand); }catch(e){ return null; }
+}
+function lageWeg(el){
+  if(!el) return;
+  el.style.backgroundImage=''; el.classList.remove('mitlage');
+  const L=el.querySelector(':scope>.bildlage'); if(L) L.remove();
+}
+
+/* Einstellen: ein Vollbild über der Maske. Ein Finger verschiebt, zwei Finger
+   zoomen um den Punkt zwischen den Fingern (Lehre aus dem Vollbild-Zoom: der
+   Anker liegt zwischen den Fingern, nicht in der Mitte), das Mausrad zoomt am
+   Zeiger. Zuhörer auf window, kein setPointerCapture - wie beim Vollbild. */
+let AS=null;        // {data, m, lage, fertig, zeiger:Map, start}
+let garageMass=null; // Maße der Garagen-Karte, zuletzt in karussellHoehe gemessen
+function ausRahmenMass(){
+  if(garageMass) return garageMass;
+  const w=Math.min(innerWidth,560)-76;
+  return {w,h:Math.min(w*2.1,Math.max(w*1.25,innerHeight-200))};
+}
+async function openAus(data,lage,fertig){
+  let m; try{ m=await bildMass(data); }catch(e){ return showErr('Das Bild konnte nicht geladen werden.'); }
+  pushModal('aus');
+  AS={data,m,lage:lageNorm(lage),fertig,zeiger:new Map(),start:null};
+  document.body.classList.add('noscroll');
+  const l=$('#ausschnitt'); l.hidden=false;
+  l.innerHTML=`<div class="ebar"><button class="btn ghost" data-a="ausZu">Abbrechen</button>
+      <div class="et"><b>Ausschnitt</b><span>Ziehen verschiebt · zwei Finger zoomen</span></div>
+      <button class="btn primary" data-a="ausOk">Übernehmen</button></div>
+    <div class="astage" id="aStage"><div class="arahmen" id="aRahmen"></div>
+      <div class="avor"><div class="avorbild" id="aVor"></div><span>So steht es<br>auf der Fahrzeugkarte</span></div></div>
+    <div class="etools"><button class="btn" data-a="ausReset">Zurücksetzen</button></div>`;
+  ausPassen(); ausZeichnen();
+}
+function closeAus(){
+  const l=$('#ausschnitt'); if(!l) return;
+  l.hidden=true; l.innerHTML=''; AS=null;
+  if($('#full').hidden&&$('#edit').hidden) document.body.classList.remove('noscroll');
+}
+// Der Rahmen hat das Seitenverhältnis der Garagen-Karte und so viel Platz,
+// wie die Bühne über der Vorschau hergibt.
+function ausPassen(){
+  const st=$('#aStage'), r=$('#aRahmen'), v=st&&st.querySelector('.avor'); if(!AS||!r) return;
+  const gm=ausRahmenMass(), q=gm.w/gm.h;
+  const bw=st.clientWidth-28, bh=st.clientHeight-28-12-(v?v.offsetHeight:0);
+  const h=Math.max(80,Math.min(bh,bw/q));
+  r.style.width=Math.round(h*q)+'px'; r.style.height=Math.round(h)+'px';
+}
+const ausGeo=()=>{ const r=$('#aRahmen'); return lageRechnen(AS.m.w,AS.m.h,r.clientWidth,r.clientHeight,AS.lage,true); };
+function ausZeichnen(){
+  if(!AS) return;
+  lageAnwenden($('#aRahmen'),AS.data,AS.m,AS.lage,true);
+  lageAnwenden($('#aVor'),AS.data,AS.m,AS.lage,false);
+}
+// Bild links oben bei (x, y), Maßstab s - daraus die Lage, geklemmt und so
+// zurückgerechnet, dass die gespeicherte Lage genau das Gezeigte beschreibt.
+function ausSetze(x,y,s){
+  const r=$('#aRahmen'), W=r.clientWidth, H=r.clientHeight, w=AS.m.w, h=AS.m.h;
+  const cover=Math.max(W/w,H/h), contain=Math.min(W/w,H/h);
+  s=Math.min(cover*LAGE_ZMAX,Math.max(contain,s));
+  const g=lageRechnen(w,h,W,H,{x:(W/2-x)/(w*s),y:(H/2-y)/(h*s),z:s/cover},true);
+  AS.lage={x:(W/2-g.x)/g.dw,y:(H/2-g.y)/g.dh,z:g.s/cover};
+}
+const ausAbstand=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function ausMerken(){
+  const z=[...AS.zeiger.values()], r=$('#aRahmen').getBoundingClientRect(), g=ausGeo();
+  if(z.length===1) AS.start={px:z[0].x,py:z[0].y,gx:g.x,gy:g.y,s:g.s};
+  else if(z.length>=2){
+    const mx=(z[0].x+z[1].x)/2-r.left, my=(z[0].y+z[1].y)/2-r.top;
+    AS.start={ab:ausAbstand(z[0],z[1]),s:g.s,ix:(mx-g.x)/g.dw,iy:(my-g.y)/g.dh};
+  }
+}
+function ausStart(e){
+  const r=$('#aRahmen'); if(!AS||!r||!r.contains(e.target)) return;
+  e.preventDefault();
+  AS.zeiger.set(e.pointerId,{x:e.clientX,y:e.clientY}); ausMerken();
+}
+function ausBewegen(e){
+  if(!AS||!AS.zeiger.has(e.pointerId)||!AS.start) return;
+  AS.zeiger.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  const z=[...AS.zeiger.values()], r=$('#aRahmen').getBoundingClientRect();
+  if(z.length>=2&&AS.start.ab){
+    const mx=(z[0].x+z[1].x)/2-r.left, my=(z[0].y+z[1].y)/2-r.top;
+    const s=AS.start.s*ausAbstand(z[0],z[1])/AS.start.ab;
+    ausSetze(mx-AS.start.ix*AS.m.w*s, my-AS.start.iy*AS.m.h*s, s);
+  }else if(z.length===1&&AS.start.px!==undefined){
+    ausSetze(AS.start.gx+(e.clientX-AS.start.px), AS.start.gy+(e.clientY-AS.start.py), AS.start.s);
+  }
+  ausZeichnen();
+}
+function ausEnde(e){
+  if(!AS||!AS.zeiger.has(e.pointerId)) return;
+  AS.zeiger.delete(e.pointerId);
+  if(AS.zeiger.size) ausMerken(); else AS.start=null;
+}
+function ausRad(e){
+  const r=$('#aRahmen'); if(!AS||!r||!r.contains(e.target)) return;
+  e.preventDefault();
+  const g=ausGeo(), rr=r.getBoundingClientRect(), px=e.clientX-rr.left, py=e.clientY-rr.top;
+  const ix=(px-g.x)/g.dw, iy=(py-g.y)/g.dh, s=g.s*Math.exp(-e.deltaY*0.0015);
+  ausSetze(px-ix*AS.m.w*s, py-iy*AS.m.h*s, s); ausZeichnen();
+}
+document.addEventListener('pointerdown',ausStart);
+addEventListener('pointermove',ausBewegen);
+addEventListener('pointerup',ausEnde);
+addEventListener('pointercancel',ausEnde);
+document.addEventListener('wheel',ausRad,{passive:false});
 
 /* ---------- Teile am Logbuch-Eintrag ----------
    Genau wie bei den Dokumenten: Ein Teil liegt ausschließlich in S.parts und
@@ -1968,7 +2155,8 @@ function vehicleSheet(isNew){
      <p class="dhint">Leer lassen, wenn der Service im Logbuch als Wartung steht – die Karte nimmt ihn von dort. Ein Datum hier ist für einen Service aus der Zeit vor der App; angezeigt wird immer das jüngere von beidem.</p>`+
     `<label>Titelbild</label>
      <div class="cbox" id="cbox"></div>
-     <div class="filebox"><button class="btn" data-a="cover">Foto wählen</button><button class="btn ghost danger" data-a="coverOff" id="coverOff" hidden>Entfernen</button></div>`,
+     <div class="filebox"><button class="btn" data-a="cover">Foto wählen</button><button class="btn ghost danger" data-a="coverOff" id="coverOff" hidden>Entfernen</button></div>
+     <div class="filebox"><button class="btn" data-a="coverLage" id="coverLageBtn" hidden>Ausschnitt anpassen</button></div>`,
     async()=>{
       const o=normMonth(vals(),'tuev'); if(!o.name) return showErr('Bitte Marke und Modell eintragen.');
       o.hsn=(o.hsn||'').replace(/\D/g,'').slice(0,4);
@@ -1986,8 +2174,13 @@ function vehicleSheet(isNew){
         if(!await store.set(coverKey(ziel.id),pendingCover.data))
           return showErr('Das Titelbild konnte nicht gespeichert werden. Der Speicher ist evtl. voll.');
         IMG[coverKey(ziel.id)]=pendingCover.data; ziel.cover=true;
+        ziel.coverLage=lageNorm(pendingCover.lage);
       }else if(pendingCover&&pendingCover.weg){
         await store.del(coverKey(ziel.id)); delete IMG[coverKey(ziel.id)]; ziel.cover=false;
+        delete ziel.coverLage;
+      }else if(pendingCover&&pendingCover.lage){
+        // Nur der Ausschnitt hat sich geändert: Das Bild bleibt, wie es liegt.
+        ziel.coverLage=lageNorm(pendingCover.lage);
       }
       ziel.v={...ziel.v,...o,km:Number(o.km||0)};
       if(isNew){ VEH[ziel.id]=ziel; IDX.push(ziel.id); S=ziel; view='vehicle'; tab='card'; }
@@ -2024,7 +2217,15 @@ const A={
   },
   // Nur noch aus der Bearbeiten-Maske erreichbar, nicht mehr von der Karte.
   cover:()=>$('#coverIn').click(),
-  coverOff:()=>{ if(!pendingCover) return; pendingCover.data=null; pendingCover.weg=true; renderCoverBox(); },
+  coverOff:()=>{ if(!pendingCover) return; pendingCover.data=null; pendingCover.weg=true; pendingCover.lage=null; renderCoverBox(); },
+  coverLage:()=>{
+    if(!pendingCover) return;
+    const bild=pendingCover.data||(!pendingCover.weg&&IMG[coverKey(pendingCover.id)]); if(!bild) return;
+    openAus(bild,coverLageAktuell(),l=>{ if(pendingCover){ pendingCover.lage=l; renderCoverBox(); } });
+  },
+  ausOk:()=>{ if(!AS) return; const f=AS.fertig, l={...AS.lage}; dismissModal(); if(f) f(l); },
+  ausZu:()=>dismissModal(),
+  ausReset:()=>{ if(!AS) return; AS.lage={...LAGE0}; ausZeichnen(); },
 
   garageZu:d=>{
     const k=$('#karussell'), c=karussellKarten()[Number(d.i)]; if(!k||!c) return;
@@ -2440,11 +2641,12 @@ addEventListener('popstate',e=>{
     const verlassen=modalStack.pop();
     if(verlassen==='full') closeFull();
     else if(verlassen==='edit') closeEdit();
+    else if(verlassen==='aus') closeAus();
     else closeSheet();
     return;
   }
   modalStack=[];
-  closeEdit(); closeFull(); closeSheet();
+  closeAus(); closeEdit(); closeFull(); closeSheet();
   if(st.s==='vehicle'&&VEH[st.id]){ S=VEH[st.id]; view='vehicle'; tab=st.tab||'card'; }
   else if(st.s==='settings'){ S=null; view='settings'; }
   else { S=null; view='garage'; }
@@ -2452,7 +2654,7 @@ addEventListener('popstate',e=>{
 });
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape') return;
-  if(!$('#edit').hidden||!$('#full').hidden||$('#sheet').classList.contains('open')) dismissModal();
+  if(!$('#ausschnitt').hidden||!$('#edit').hidden||!$('#full').hidden||$('#sheet').classList.contains('open')) dismissModal();
 });
 document.addEventListener('change',async e=>{
   const t=e.target;
@@ -2463,7 +2665,11 @@ document.addEventListener('change',async e=>{
   if(t.id==='coverIn'&&t.files[0]&&pendingCover){
     try{
       const r=await fileToData(t.files[0],1200);
-      pendingCover.data=r.data; pendingCover.weg=false; renderCoverBox(); showErr('');
+      pendingCover.data=r.data; pendingCover.weg=false; pendingCover.lage={...LAGE0};
+      renderCoverBox(); showErr('');
+      // Gleich nach der Auswahl den Ausschnitt einstellen. Wer abbricht,
+      // behält das Foto mit der Mitte.
+      openAus(r.data,LAGE0,l=>{ if(pendingCover){ pendingCover.lage=l; renderCoverBox(); } });
     }catch(err){showErr(err.message||'Das Bild konnte nicht gelesen werden.')}
     t.value='';
   }

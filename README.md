@@ -140,6 +140,16 @@ Durch den Zuschnitt aus dem Abschnitt oben geht das Titelbild bewusst **nicht**:
 Ein Autofoto ist kein Dokument, Geraderücken und Dokument-Modus wären hier
 verkehrt.
 
+**Den Ausschnitt** stellst du direkt nach der Auswahl ein, später jederzeit über
+*Ausschnitt anpassen* in derselben Maske: Mit einem Finger verschieben, mit zwei
+Fingern zoomen (der Punkt zwischen den Fingern bleibt stehen), am Rechner mit
+dem Mausrad. Eingestellt wird im hohen Rahmen der Garagen-Karte, darunter steht
+die Vorschau für den 4:3-Rahmen der Fahrzeugkarte – beide nehmen denselben
+Bildpunkt als Mitte. Herauszoomen geht bis zum ganzen Bild; der freie Rand zeigt
+dann eine unscharfe, abgedunkelte Kopie. Das Foto selbst bleibt dabei
+unverändert gespeichert, am Fahrzeug liegt nur die Lage (`coverLage`: Bildpunkt
+und Zoom). Fahrzeuge ohne Lage zeigen wie bisher die bildfüllende Mitte.
+
 ## Ansehen und ändern — überall derselbe Weg
 
 In allen vier Reitern gilt dasselbe: **Antippen heißt ansehen.** Geändert wird
@@ -449,6 +459,7 @@ die App:
 | `vorspann` | Vorspann beim Öffnen: steht ab Seitenstart, fängt Tipps ab, verzögert den Start der App nicht, nach 3 Sekunden ganz weg; die übrigen Reihen schalten ihn ab |
 | `installationskarte` | QR-Code der Karte in `karte/` führt auf die Adresse aus `CLAUDE.md`; PDF mit einer Seite; die Verweise der README gehen nicht ins Leere |
 | `garage` | Karussell der Garage: Karten nebeneinander, im Hochformat und bis unten, Bild füllt die Karte, Höhe folgt dem Fenster, Nachbar lugt herein, Einrasten nach einer Scroll-Geste, Punkte, gemerkte Stelle nach Öffnen und Zurück, Plus oben, Platzhalter, ein Fahrzeug, leere Garage. Touch-Gesten kommen im Testbrowser nicht an – geprüft ist das Scrollen, nicht der Finger |
+| `titelbild` | Ausschnitt des Titelbilds: öffnet nach der Auswahl, Ziehen mit Klemmen, zwei Finger mit stehendem Anker, ganz heraus mit unscharfem Rand, Lage in Garage und Fahrzeugkarte, nachträglich ohne das Bild neu zu schreiben, Zurück-Geste, Abbrechen, ältere Fahrzeuge, Sicherung, 360 px |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter

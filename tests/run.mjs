@@ -22,8 +22,9 @@ import * as installationskarte from './installationskarte.test.mjs';
 import * as garage from './garage.test.mjs';
 import * as titelbild from './titelbild.test.mjs';
 import * as mehrfach from './mehrfach.test.mjs';
+import * as pdf from './pdf.test.mjs';
 
-const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera, vollbild, karte, speicher, logteile, lesen, anhaenge, blatt, kategorien, vorspann, installationskarte, garage, titelbild, mehrfach];
+const suiten = [grundfunktionen, sicherung, plattformen, navigation, einstellungen, logdokumente, scan, kamera, vollbild, karte, speicher, logteile, lesen, anhaenge, blatt, kategorien, vorspann, installationskarte, garage, titelbild, mehrfach, pdf];
 
 const { base, close } = await serve();
 const browser = await launch();

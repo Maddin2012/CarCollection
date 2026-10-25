@@ -128,7 +128,9 @@ export default async function ({ browser, base, ok }) {
   await page.waitForSelector('.empty');
   ok((await page.locator('.item').count()) === 0, 'Die Liste ist leer');
 
-  // --- PDF: Blatt ohne Löschen, mit Stift ---
+  // --- PDF: Anzeige ohne Löschen, mit Stift ---
+  // Seit Fassung 36 öffnet eine PDF in der eigenen Anzeige im Vollbild, nicht
+  // mehr im Blatt. Die Aussagen bleiben: kein Löschen, dafür der Stift.
   await page.click('[data-a="addDoc"]');
   await page.setInputFiles('#fPick', PDF);
   await page.waitForSelector('#fname:not(:empty)');
@@ -136,13 +138,12 @@ export default async function ({ browser, base, ok }) {
   await page.click('[data-a="ok"]');
   await page.waitForSelector('.item');
   await page.click('[data-a="openDoc"]');
-  await page.waitForSelector('[data-a="savePdf"]');
-  ok((await page.locator('.panel [data-a="del"]').count()) === 0,
+  await page.waitForSelector('#full:not([hidden]) #fpdf');
+  ok((await page.locator('#full [data-a="del"], .panel [data-a="del"]').count()) === 0,
     'Die PDF-Ansicht hat keinen Löschen-Knopf');
-  await blattRuht();
-  ok(await frei(page, '.shead [data-a="editDoc"]'),
-    'Dafür den Stift in der Ecke des Blattes');
-  await page.click('.shead [data-a="editDoc"]');
+  ok(await frei(page, '#full .fbar [data-a="editDoc"]'),
+    'Dafür den Stift in der Leiste oben');
+  await page.click('#full .fbar [data-a="editDoc"]');
   await page.waitForSelector('[name="title"]');
   ok(await page.inputValue('[name="title"]') === 'Rechnung Werkstatt',
     'Der Stift öffnet die Maske auch für eine PDF');

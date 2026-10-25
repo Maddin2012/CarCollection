@@ -4,14 +4,18 @@
    WICHTIG: bei jeder Änderung an index.html o. ä. die Fassung hochzählen - hier
    CACHE, dazu APP_VERSION in index.html und version.json. Alle drei müssen
    dieselbe Zahl tragen, die CI vergleicht sie. */
-const CACHE = 'carcollection-v35';
+const CACHE = 'carcollection-v36';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './icons/apple-touch-icon.png'
+  './icons/apple-touch-icon.png',
+  // PDF.js für die PDF-Anzeige (Fassung 36) - gleich mit, damit PDFs auch
+  // offline aufgehen. Geladen wird es erst beim Öffnen einer PDF.
+  './vendor/pdfjs/pdf.min.js',
+  './vendor/pdfjs/pdf.worker.min.js'
 ];
 
 self.addEventListener('install', e => {

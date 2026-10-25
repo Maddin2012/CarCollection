@@ -122,17 +122,20 @@ export default async function ({ browser, base, ok }) {
     await page.fill('[name="title"]', 'Fahrzeugschein');
     await page.click('[data-a="ok"]');
     await page.waitForSelector('.item');
+    // Seit Fassung 36 zeigt die App die PDF selbst an (Vollbild). Weitergegeben
+    // wird sie über den Teilen-Knopf in der Leiste - weiterhin als Datei.
     await page.click('[data-a="openDoc"]');
-    await page.waitForSelector('[data-a="savePdf"]');
-    ok(await page.locator('#full[hidden]').count() === 1, 'PDFs öffnen weiterhin im Sheet, nicht in Vollbild');
-    ok(await page.locator('.viewer a[href^="data:"]').count() === 0, 'Kein data:-Verweis mehr für PDFs');
-    await page.click('[data-a="savePdf"]');
+    await page.waitForSelector('#full:not([hidden]) .fbar [data-a="savePdf"]');
+    ok(await page.locator('#full:not([hidden]) #fpdf').count() === 1, 'PDFs öffnen in der eigenen Anzeige im Vollbild');
+    ok(await page.locator('#full a[href^="data:"], .viewer a[href^="data:"]').count() === 0, 'Kein data:-Verweis für PDFs');
+    await page.click('#full .fbar [data-a="savePdf"]');
     await page.waitForFunction(() => window.__shared.length > 1);
     shared = await page.evaluate(() => window.__shared);
     ok(shared[1][0].name === 'Fahrzeugschein.pdf' && shared[1][0].type === 'application/pdf',
       `PDF wird geteilt: ${shared[1][0].name}`);
     ok(shared[1][0].size > 0, 'PDF-Inhalt ist nicht leer');
-    await page.click('.panel .row [data-a="close"]');
+    await page.click('#full .fbar [data-a="closeFull"]');
+    await page.waitForSelector('#full[hidden]', { state: 'attached' });
 
     // --- Sicherung im Startbildschirm-Modus ---
     await page.goBack();

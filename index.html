@@ -153,6 +153,13 @@ nav button.on{color:var(--accent)}
 body.noscroll{overflow:hidden}
 #full{position:fixed;inset:0;z-index:30;background:#070A10;display:flex;flex-direction:column}
 #full[hidden]{display:none}
+/* PDF-Anzeige (Fassung 36): Seiten untereinander, eigener Zoom wie beim Bild. */
+.fpdf{flex:1;min-height:0;position:relative;overflow:hidden;touch-action:none;background:#070A10}
+.pseiten{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+.pseiten canvas{display:block;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.4)}
+.pnr{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(16,21,31,.88);border:1px solid var(--line);color:var(--text);font-size:12.5px;padding:5px 12px;border-radius:99px;pointer-events:none;white-space:nowrap}
+.pinfo{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;color:var(--muted);font-size:14px}
+.pinfo .btn{max-width:320px;width:100%}
 .fbar{flex:none;display:flex;align-items:center;gap:12px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:rgba(16,21,31,.9);border-bottom:1px solid var(--line)}
 .fbar .ft{flex:1;min-width:0}
 .fbar .ft b{display:block;font-family:var(--font);font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -337,7 +344,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',mkb:'',gkb:'',farbe:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='35';
+const APP_VERSION='36';
 let S=null, VEH={}, IDX=[], view='garage';
 // Das Fahrzeug, bei dem das Garagen-Karussell zuletzt stand. Wer ein Fahrzeug
 // öffnet und zurückgeht, landet wieder dort und nicht beim ersten.
@@ -730,6 +737,7 @@ const ICONS={
   part:'<path d="M21.2 12L16.6 20L7.4 20L2.8 12L7.4 4L16.6 4Z"/><circle cx="12" cy="12" r="3.6"/>',
   edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
+  teilen:'<path d="M12 3v12"/><path d="M7.5 7.5L12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>',
   close:'<path d="M6 6l12 12M18 6L6 18"/>',
   rot:'<path d="M4 9h11a4.5 4.5 0 0 1 0 9H8"/><path d="M7.5 5.5L4 9l3.5 3.5"/>',
   /* Ein geschlossener Zahnkranz mit sechs rechteckigen Zähnen plus Nabe,
@@ -1757,6 +1765,7 @@ function openFull(doc,data){
   else bild.addEventListener('load',vollPassen,{once:true});
 }
 function closeFull(){
+  pdfZu();
   const f=$('#full'); f.hidden=true; f.innerHTML=''; fullDoc=null; V=null;
   document.body.classList.remove('noscroll');
 }
@@ -1890,6 +1899,260 @@ addEventListener('pointermove',vollBewegen);
 addEventListener('pointerup',vollEnde);
 addEventListener('pointercancel',vollEnde);
 document.addEventListener('wheel',vollRad,{passive:false});
+
+/* ---------- PDFs in der App ansehen (Fassung 36) ----------
+   Chrome auf Android zeigt eine PDF nicht verlässlich innerhalb einer Seite
+   an; bis Fassung 35 ging sie deshalb ins Teilen-Blatt, man musste sie also
+   erst weitergeben oder abspeichern. Jetzt malt PDF.js (Mozilla, unverändert
+   in vendor/pdfjs, siehe README) die Seiten selbst - auf dem Gerät, ohne Netz.
+   Geladen wird die Bibliothek erst, wenn eine PDF geöffnet wird.
+
+   Bewegt wird wie beim Bild mit eigenem Zeiger-Code: Die Spalte mit allen
+   Seiten liegt links oben und wird mit translate/scale verschoben. Ein Finger
+   schiebt (und läuft nach dem Loslassen aus), zwei Finger zoomen um den Punkt
+   zwischen ihnen, das Mausrad schiebt, mit Strg zoomt es. */
+const PDF_LUECKE=10, PDF_RAND=8, P_MAX=6;
+const PDF_KANTE=4096, PDF_FLAECHE=16e6;   // größtes Canvas je Seite, in Pixeln
+let P=null;   // {doc, seiten:[{nr,w,h,top,canvas,guete,aufgabe}], s,x,y,W,H,hoehe, zeiger, start, tempo, lauf}
+let pdfLib=null;
+
+async function pdfBibliothek(){
+  if(pdfLib) return pdfLib;
+  const lib=await import('./vendor/pdfjs/pdf.min.js');
+  lib.GlobalWorkerOptions.workerSrc=new URL('vendor/pdfjs/pdf.worker.min.js',location.href).href;
+  return pdfLib=lib;
+}
+
+async function openPdf(doc,data){
+  pushModal('full');
+  fullDoc=doc;
+  const f=$('#full');
+  f.innerHTML=`<div class="fbar">
+      <button class="btn ghost ico" data-a="closeFull" aria-label="Schließen"><svg viewBox="0 0 24 24">${ICONS.close}</svg></button>
+      <div class="ft"><b>${esc(doc.title)}</b><span>${esc(doc.category)}${doc.date?' · '+dt(doc.date):''}${docBezug(doc)}</span></div>
+      <button class="btn ghost ico" data-a="savePdf" aria-label="PDF teilen oder sichern"><svg viewBox="0 0 24 24">${ICONS.teilen}</svg></button>
+      <button class="btn ghost ico" data-a="editDoc" data-id="${doc.id}" aria-label="Dokument bearbeiten"><svg viewBox="0 0 24 24">${ICONS.edit}</svg></button>
+    </div>
+    <div class="fpdf" id="fpdf"><div class="pinfo" id="pinfo">PDF wird geladen …</div></div>`;
+  f.hidden=false;
+  document.body.classList.add('noscroll');
+  const meins={};   // Erkennungszeichen: Wurde inzwischen geschlossen oder neu geöffnet?
+  P={meins,doc:null,seiten:[],s:1,x:0,y:0,W:0,H:0,hoehe:0,zeiger:new Map(),start:null,tempo:null,lauf:0};
+  let pdf=null;
+  try{
+    const lib=await pdfBibliothek();
+    const roh=new Uint8Array(await dataToBlob(data).arrayBuffer());
+    pdf=await lib.getDocument({data:roh,isEvalSupported:false}).promise;
+    if(!P||P.meins!==meins){ pdf.destroy(); return; }
+    if(!pdf.numPages) throw new Error('Die PDF hat keine Seiten.');
+    P.doc=pdf;
+    const seiten=[];
+    for(let i=1;i<=pdf.numPages;i++){
+      const vp=(await pdf.getPage(i)).getViewport({scale:1});
+      seiten.push({nr:i,w:vp.width,h:vp.height,canvas:null,guete:0,aufgabe:null});
+    }
+    if(!P||P.meins!==meins) return;
+    P.seiten=seiten;
+    pdfAufbauen();
+  }catch(err){
+    if(pdf&&(!P||P.doc!==pdf)) pdf.destroy();
+    if(!P||P.meins!==meins) return;
+    pdfFehler();
+  }
+}
+
+// Kein Absturz und nichts verändert: Hinweis und der bisherige Weg nach draußen.
+function pdfFehler(){
+  const box=$('#fpdf'); if(!box) return;
+  box.innerHTML=`<div class="pinfo" id="pinfo"><p>Diese PDF lässt sich hier nicht anzeigen.</p>
+    <button class="btn primary" data-a="savePdf">PDF öffnen oder sichern</button></div>`;
+}
+
+// Platzhalter in Seitengröße anlegen, damit beim Malen nichts springt.
+function pdfAufbauen(){
+  const box=$('#fpdf'); if(!P||!box) return;
+  P.W=box.clientWidth; P.H=box.clientHeight;
+  const breite=P.W-2*PDF_RAND;
+  let top=PDF_RAND;
+  box.innerHTML='<div class="pseiten" id="pseiten"></div><div class="pnr" id="pnr"></div>';
+  const spalte=$('#pseiten');
+  spalte.style.width=P.W+'px';
+  for(const sd of P.seiten){
+    const h=breite*sd.h/sd.w;
+    const c=document.createElement('canvas');
+    c.style.cssText=`width:${breite}px;height:${h}px;margin:0 ${PDF_RAND}px ${PDF_LUECKE}px`;
+    c.dataset.seite=sd.nr;
+    spalte.appendChild(c);
+    Object.assign(sd,{canvas:c,top,cssW:breite,cssH:h,guete:0});
+    top+=h+PDF_LUECKE;
+  }
+  P.hoehe=top-PDF_LUECKE+PDF_RAND;
+  P.s=1; P.x=0; P.y=0;
+  pdfKlemmen(); pdfAnwenden(); pdfMalen();
+}
+
+const pdfAnwenden=()=>{
+  if(!P) return;
+  const sp=$('#pseiten'); if(sp) sp.style.transform=`translate(${P.x}px,${P.y}px) scale(${P.s})`;
+  const nr=$('#pnr'); if(nr&&P.seiten.length) nr.textContent=`Seite ${pdfSeiteJetzt()} von ${P.seiten.length}`;
+};
+
+// Die Seite, die gerade die Mitte der Fläche einnimmt.
+function pdfSeiteJetzt(){
+  const mitte=(P.H/2-P.y)/P.s;
+  let nr=1;
+  for(const sd of P.seiten) if(sd.top<=mitte) nr=sd.nr;
+  return nr;
+}
+
+/* Nie über den Rand hinaus. Ist die Spalte schmaler oder kürzer als die
+   Fläche, steht sie mittig; sonst darf sie höchstens bis zu ihrem Rand. */
+function pdfKlemmen(){
+  if(!P) return;
+  const w=P.W*P.s, h=P.hoehe*P.s;
+  P.x=w<=P.W?(P.W-w)/2:Math.min(0,Math.max(P.W-w,P.x));
+  P.y=h<=P.H?(P.H-h)/2:Math.min(0,Math.max(P.H-h,P.y));
+}
+
+// Zoom auf den Punkt (px, py) in der Fläche: Der Inhaltspunkt darunter bleibt.
+function pdfZoom(neu,px,py){
+  if(!P) return;
+  neu=Math.min(P_MAX,Math.max(1,neu));
+  const ux=(px-P.x)/P.s, uy=(py-P.y)/P.s;
+  P.s=neu; P.x=px-ux*neu; P.y=py-uy*neu;
+  pdfKlemmen(); pdfAnwenden();
+}
+
+/* Sichtbare Seiten (dazu je eine Bildschirmhöhe darüber und darunter) in der
+   Auflösung malen, die der Zoom verlangt; weit entfernte wieder freigeben -
+   eine lange PDF bliebe sonst ganz im Speicher. */
+function pdfMalen(){
+  if(!P||!P.doc) return;
+  const oben=(-P.y)/P.s-P.H/P.s, unten=(-P.y+P.H)/P.s+P.H/P.s;
+  const dpr=window.devicePixelRatio||1;
+  for(const sd of P.seiten){
+    const nah=sd.top+sd.cssH>=oben&&sd.top<=unten;
+    if(!nah){
+      if(sd.guete){ if(sd.aufgabe) sd.aufgabe.cancel(); sd.aufgabe=null; sd.canvas.width=0; sd.canvas.height=0; sd.guete=0; }
+      continue;
+    }
+    let g=dpr*P.s;
+    const pw=sd.cssW*g, ph=sd.cssH*g;
+    const k=Math.min(1,PDF_KANTE/Math.max(pw,ph),Math.sqrt(PDF_FLAECHE/(pw*ph)));
+    g*=k;
+    if(Math.abs(g-sd.guete)<.01) continue;
+    pdfSeiteMalen(sd,g);
+  }
+}
+
+async function pdfSeiteMalen(sd,g){
+  const p=P;
+  if(sd.aufgabe){ sd.aufgabe.cancel(); sd.aufgabe=null; }
+  sd.guete=g;
+  try{
+    const seite=await p.doc.getPage(sd.nr);
+    if(P!==p||sd.guete!==g) return;
+    const vp=seite.getViewport({scale:sd.cssW/sd.w*g});
+    // In ein eigenes Canvas malen und erst fertig austauschen - sonst
+    // blitzt beim Schärfer-Malen kurz eine leere Seite auf.
+    const neu=document.createElement('canvas');
+    neu.width=Math.floor(vp.width); neu.height=Math.floor(vp.height);
+    sd.aufgabe=seite.render({canvasContext:neu.getContext('2d'),viewport:vp});
+    await sd.aufgabe.promise;
+    if(P!==p||sd.guete!==g) return;
+    sd.aufgabe=null;
+    sd.canvas.width=neu.width; sd.canvas.height=neu.height;
+    sd.canvas.getContext('2d').drawImage(neu,0,0);
+    sd.canvas.dataset.guete=g.toFixed(3);
+  }catch(e){
+    // Abgebrochen, weil inzwischen anders gezoomt wurde - die neue Runde malt.
+    if(e&&e.name==='RenderingCancelledException') return;
+    if(P===p&&sd.guete===g) sd.guete=0;
+  }
+}
+
+function pdfZu(){
+  if(!P) return;
+  cancelAnimationFrame(P.lauf);
+  for(const sd of P.seiten) if(sd.aufgabe) sd.aufgabe.cancel();
+  if(P.doc) P.doc.destroy();
+  P=null;
+}
+
+// Nach dem Loslassen auslaufen lassen, wie man es vom Scrollen kennt.
+function pdfAuslaufen(vx,vy){
+  let t=performance.now();
+  const schritt=jetzt=>{
+    if(!P) return;
+    const dt=Math.min(40,jetzt-t); t=jetzt;
+    const x0=P.x, y0=P.y;
+    P.x+=vx*dt; P.y+=vy*dt; pdfKlemmen(); pdfAnwenden();
+    const r=Math.pow(.995,dt); vx*=r; vy*=r;
+    if(Math.hypot(vx,vy)<.02||(P.x===x0&&P.y===y0)){ P.lauf=0; pdfMalen(); return; }
+    P.lauf=requestAnimationFrame(schritt);
+  };
+  P.lauf=requestAnimationFrame(schritt);
+}
+
+function pdfStart(e){
+  const f=$('#fpdf');
+  if(!P||!f||!f.contains(e.target)||!P.seiten.length) return;
+  e.preventDefault();
+  cancelAnimationFrame(P.lauf); P.lauf=0;
+  const r=f.getBoundingClientRect();
+  P.zeiger.set(e.pointerId,{x:e.clientX-r.left,y:e.clientY-r.top});
+  pdfAnsetzen();
+}
+function pdfAnsetzen(){
+  const z=[...P.zeiger.values()];
+  if(z.length===1) P.start={x:z[0].x,y:z[0].y,tx:P.x,ty:P.y,spur:[{x:z[0].x,y:z[0].y,t:performance.now()}]};
+  else if(z.length>=2) P.start={ab:Math.hypot(z[0].x-z[1].x,z[0].y-z[1].y),
+    ux:((z[0].x+z[1].x)/2-P.x)/P.s, uy:((z[0].y+z[1].y)/2-P.y)/P.s, s:P.s};
+}
+function pdfBewegen(e){
+  if(!P||!P.zeiger.has(e.pointerId)||!P.start) return;
+  const f=$('#fpdf'); if(!f) return;
+  const r=f.getBoundingClientRect();
+  P.zeiger.set(e.pointerId,{x:e.clientX-r.left,y:e.clientY-r.top});
+  const z=[...P.zeiger.values()];
+  if(z.length>=2&&P.start.ab){
+    const mx=(z[0].x+z[1].x)/2, my=(z[0].y+z[1].y)/2;
+    const neu=Math.min(P_MAX,Math.max(1,P.start.s*Math.hypot(z[0].x-z[1].x,z[0].y-z[1].y)/P.start.ab));
+    // Der Inhaltspunkt, der zu Beginn zwischen den Fingern lag, bleibt dort.
+    P.s=neu; P.x=mx-P.start.ux*neu; P.y=my-P.start.uy*neu;
+  }else if(z.length===1&&P.start.spur){
+    P.x=P.start.tx+(z[0].x-P.start.x); P.y=P.start.ty+(z[0].y-P.start.y);
+    const sp=P.start.spur; sp.push({x:z[0].x,y:z[0].y,t:performance.now()}); if(sp.length>6) sp.shift();
+  }
+  pdfKlemmen(); pdfAnwenden();
+}
+function pdfEnde(e){
+  if(!P||!P.zeiger.has(e.pointerId)) return;
+  P.zeiger.delete(e.pointerId);
+  if(P.zeiger.size){ pdfAnsetzen(); return; }
+  const sp=P.start&&P.start.spur; P.start=null;
+  if(sp&&sp.length>1){
+    const a=sp[0], b=sp[sp.length-1], dt=b.t-a.t;
+    if(dt>0&&dt<200&&performance.now()-b.t<80){ pdfAuslaufen((b.x-a.x)/dt,(b.y-a.y)/dt); return; }
+  }
+  pdfMalen();
+}
+let pdfRadRuhe=0;
+function pdfRad(e){
+  const f=$('#fpdf');
+  if(!P||!f||!f.contains(e.target)||!P.seiten.length) return;
+  e.preventDefault();
+  const r=f.getBoundingClientRect();
+  if(e.ctrlKey) pdfZoom(P.s*Math.exp(-e.deltaY*0.01),e.clientX-r.left,e.clientY-r.top);
+  else{ P.x-=e.deltaX; P.y-=e.deltaY; pdfKlemmen(); pdfAnwenden(); }
+  clearTimeout(pdfRadRuhe); pdfRadRuhe=setTimeout(pdfMalen,150);
+}
+document.addEventListener('pointerdown',pdfStart);
+addEventListener('pointermove',pdfBewegen);
+addEventListener('pointerup',pdfEnde);
+addEventListener('pointercancel',pdfEnde);
+document.addEventListener('wheel',pdfRad,{passive:false});
+addEventListener('resize',()=>{ if(P&&P.seiten.length&&$('#fpdf')) pdfAufbauen(); });
 
 /* ---------- Das Blatt nach unten wegziehen ----------
    Der Balken oben in der Mitte sah bisher nach einer Ziehgeste aus, und es gab
@@ -2682,6 +2945,10 @@ const A={
     // Bilder gehören in die Vollbildanzeige - im Sheet bleibt von einem
     // eingescannten Dokument zu wenig übrig, um etwas lesen zu können.
     if(data&&doc.type==='image') return openFull(doc,data);
+    if(data&&doc.type==='pdf'){
+      pendingDoc={name:doc.title.replace(/[^\w -]+/g,'_')+'.pdf',data};
+      return openPdf(doc,data);
+    }
     const view=!data?'<p class="meta">Datei nicht gefunden.</p>'
       :'<button class="btn primary" style="display:block;width:100%" data-a="savePdf">PDF öffnen oder sichern</button>';
     pendingDoc=(data&&doc.type==='pdf')?{name:doc.title.replace(/[^\w -]+/g,'_')+'.pdf',data}:null;

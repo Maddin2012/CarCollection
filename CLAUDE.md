@@ -19,7 +19,11 @@ Diese Regel wiegt schwerer als eine schnelle Antwort.
 ## Das Projekt
 
 CarCollection ist eine Single-File-Web-App: `index.html` enthält Markup,
-Styles und die gesamte Logik. Kein Build, keine Abhängigkeiten, kein Server.
+Styles und die gesamte Logik. Kein Build, kein Server, keine Abhängigkeiten —
+mit **einer** vom Nutzer freigegebenen Ausnahme (25.10.2026): PDF.js für die
+PDF-Anzeige, unverändert in `vendor/pdfjs/` (Fassung in `package.json`, ein
+Test vergleicht die Dateien bytegenau mit dem Paket). Weitere fremde
+Bibliotheken nur nach Rückfrage.
 Beschreibung der Funktionen und der Einrichtung steht in `README.md`.
 
 Die App wird über GitHub Pages aus `main` ausgeliefert:

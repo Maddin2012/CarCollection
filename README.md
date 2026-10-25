@@ -1,7 +1,8 @@
 # CarCollection
 
 Eine Web-App zur Verwaltung mehrerer Fahrzeuge: Garage, Logbuch, Dokumente und
-Teile. Kein Build-Schritt, keine Abhängigkeiten, kein Server, kein Konto.
+Teile. Kein Build-Schritt, kein Server, kein Konto. Einzige fremde Bibliothek ist
+PDF.js für die PDF-Anzeige (siehe [PDFs ansehen](#pdfs-ansehen)).
 
 ## Deine Daten bleiben bei dir
 
@@ -187,7 +188,7 @@ Stift.
 | Fahrzeug | die Karte | Fahrzeugdaten |
 | Logbuch-Eintrag | Leseblatt | Eintrag bearbeiten |
 | Dokument (Bild) | Vollbild | Dokument bearbeiten |
-| Dokument (PDF) | Blatt mit *PDF öffnen* | Dokument bearbeiten |
+| Dokument (PDF) | PDF-Anzeige im Vollbild | Dokument bearbeiten |
 | Teil | Leseblatt | Teil bearbeiten |
 
 **Ein Dokument ließ sich bis Fassung 14 überhaupt nicht ändern** — Titel,
@@ -222,6 +223,38 @@ Seitenzoom des Browsers, und den gibt es in der installierten App
 (`display: standalone`) gar nicht. Ein gespeichertes Dokument ließ sich dort
 also nicht vergrößern. Der Zoom ist jetzt eigener Code der App und hängt nicht
 mehr daran, wie die App gestartet wurde.
+
+## PDFs ansehen
+
+Seit Fassung 36 zeigt die App eine PDF **selbst** an: Ein Tipp öffnet sie im
+Vollbild, die Seiten stehen untereinander, unten steht „Seite 2 von 5“. Vorher
+ging sie ins Teilen-Blatt von Android, man musste sie also erst an eine andere
+App weitergeben oder abspeichern, um hineinzusehen. Chrome auf Android zeigt
+eine PDF nicht verlässlich innerhalb einer Seite an.
+
+- **Ein Finger** schiebt durch das Dokument und läuft nach dem Loslassen aus.
+- **Zwei Finger** vergrößern bis zum Sechsfachen, die Stelle zwischen den
+  Fingern bleibt stehen. Danach wird die Seite schärfer neu gemalt.
+- Am Rechner scrollt das **Mausrad**, mit **Strg** zoomt es.
+- Oben in der Leiste: **Teilen** (gibt die PDF wie bisher an eine andere App
+  weiter oder speichert sie) und der **Stift** für Titel, Kategorie und Datum.
+
+Lässt sich eine PDF nicht anzeigen (kaputt, ohne Seiten), sagt die App das und
+bietet *PDF öffnen oder sichern* an. Verändert oder gelöscht wird dabei nichts.
+
+**PDF.js** von Mozilla (Apache-2.0) malt die Seiten. Es liegt unverändert in
+`vendor/pdfjs/` (die `legacy`-Ausgabe von `pdfjs-dist`, Fassung in
+`package.json`; Lizenz daneben). Die Dateien heißen dort `.js` statt `.mjs`,
+weil nicht jeder Server `.mjs` mit dem richtigen Typ ausliefert und ein Modul
+mit falschem Typ nicht lädt. Ein Test vergleicht sie bytegenau mit dem Paket.
+Die `legacy`-Ausgabe ist gewählt, weil die normale `Promise.withResolvers`
+voraussetzt (Chrome ab 119, Safari ab 17.4).
+
+Geladen wird PDF.js erst, wenn eine PDF geöffnet wird, der Start der App wird
+also nicht langsamer. Der Service Worker legt es bei der Installation ab, damit
+PDFs auch **ohne Netz** aufgehen. Die PDF verlässt das Gerät dabei nicht: Sie
+kommt aus dem Browserspeicher und wird auf dem Gerät gemalt; ein Test prüft,
+dass beim Öffnen keine Anfrage an einen fremden Server geht.
 
 ## Logbuch-Eintrag lesen und bearbeiten
 
@@ -486,6 +519,7 @@ die App:
 | `garage` | Karussell der Garage: Karten nebeneinander, im Hochformat und bis unten, Bild füllt die Karte, Höhe folgt dem Fenster, Nachbar lugt herein, Einrasten nach einer Scroll-Geste, Punkte, gemerkte Stelle nach Öffnen und Zurück, Plus oben, Platzhalter, ein Fahrzeug, leere Garage. Touch-Gesten kommen im Testbrowser nicht an – geprüft ist das Scrollen, nicht der Finger |
 | `titelbild` | Ausschnitt des Titelbilds: öffnet nach der Auswahl, Ziehen mit Klemmen, zwei Finger mit stehendem Anker, ganz heraus mit unscharfem Rand, gespeicherter Bereich gleich dem gewählten, Garage zeigt ihn an derselben Stelle, Fahrzeugkarte ganz über dem Namen, Hochkant-Foto verkleinert über den Namen geschoben, Panorama und hohe Streifen rechnerisch, Name und Kennzeichen im Ausschnitt, Lage aus Fassung 33, nachträglich ohne das Bild neu zu schreiben, Zurück-Geste, Abbrechen, ältere Fahrzeuge, Sicherung, 360 px |
 | `mehrfach` | Mehrere Dateien auf einmal: Auswahl mit `multiple`, Fotos nacheinander im Zuschnitt mit „Bild n von m“, Zurück-Geste lässt nur ein Foto weg, Liste mit Titel je Datei, leerer Titel, Speicherfehler räumt auf, Entfernen, zurück auf eine Datei, Kategorie aus dem Filter (Fahrwerk, Alle, Fotos), mehrere Anhänge am Logbuch-Eintrag, 360 px |
+| `pdf` | PDF-Anzeige: PDF.js bytegleich mit dem Paket und genau festgelegt, Seiten wirklich gemalt (Farbe am Pixel), Seitenzähler, Schieben mit Anschlag oben und unten, Zoom mit stehendem Punkt und schärferem Neumalen, Teilen, Zurück-Geste, Stift, kaputte PDF, 360 px, keine Anfrage an fremde Server, offline aus dem Vorab-Cache |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter
@@ -630,7 +664,7 @@ Beides ist im Code berücksichtigt:
 | --- | --- | --- |
 | TÜV-Monat | natives Monatsfeld | zwei Auswahlfelder, weil Safari `input[type=month]` nicht kennt |
 | Dateien ausgeben | Teilen-Blatt **nur für erlaubte Typen** (`.txt`, `.pdf`, Bilder …), sonst Download | Teilen-Blatt; `<a download>` kann im Startbildschirm-Modus still scheitern |
-| PDF ansehen | Blob-Verweis | Blob-Verweis; `data:`-Verweise öffnet iOS nicht |
+| PDF ansehen | PDF.js in der App (`legacy`-Ausgabe) | PDF.js in der App; der Weg nach draußen über das Teilen-Blatt, `data:`-Verweise öffnet iOS nicht |
 | Speicher | IndexedDB, dauerhaft angefragt | IndexedDB; `persist()` fehlt, dafür schützt der Home-Bildschirm |
 
 Die Erkennung läuft über Funktionsprüfung, nicht über die Browserkennung — es

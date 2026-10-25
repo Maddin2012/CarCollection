@@ -120,6 +120,11 @@ export default async function ({ browser, base, ok }) {
     const b = document.getElementById('cbox');
     return b && b.style.backgroundImage.startsWith('url(');
   });
+  // Seit Fassung 33 öffnet sich nach der Auswahl der Ausschnitt; hier wird er
+  // unverändert übernommen (geprüft wird er in der Reihe Titelbild).
+  await page.waitForSelector('#ausschnitt:not([hidden]) [data-a="ausOk"]');
+  await page.click('#ausschnitt [data-a="ausOk"]');
+  await page.waitForFunction(() => document.getElementById('ausschnitt').hidden);
   ok(true, 'Das gewählte Bild erscheint als Vorschau in der Maske');
   ok(await page.locator('#coverOff:not([hidden])').count() === 1, 'Der Knopf "Entfernen" wird sichtbar');
 
@@ -137,6 +142,11 @@ export default async function ({ browser, base, ok }) {
     const b = document.getElementById('cbox');
     return b && b.style.backgroundImage.startsWith('url(');
   });
+  // Seit Fassung 33 öffnet sich nach der Auswahl der Ausschnitt; hier wird er
+  // unverändert übernommen (geprüft wird er in der Reihe Titelbild).
+  await page.waitForSelector('#ausschnitt:not([hidden]) [data-a="ausOk"]');
+  await page.click('#ausschnitt [data-a="ausOk"]');
+  await page.waitForFunction(() => document.getElementById('ausschnitt').hidden);
   await page.click('[data-a="ok"]');
   await sheetZu();
   ok(await imSpeicher() === true, 'Nach dem Speichern liegt das Bild im Speicher');

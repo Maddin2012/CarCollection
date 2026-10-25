@@ -29,6 +29,7 @@ export default async function ({ browser, base, ok }) {
   await page.fill('[name="serviceKm"]', '120000');
   await page.fill('[name="mkb"]', 'CJXA');
   await page.fill('[name="gkb"]', 'QDT');
+  await page.fill('[name="farbe"]', 'LC9X Deep Black');
   await page.click('[data-a="ok"]');
   await page.waitForSelector('.head h2');
 
@@ -107,6 +108,7 @@ export default async function ({ browser, base, ok }) {
     'Der letzte Service steht in der Sicherung');
   ok(backup.vehicles[0].v.mkb === 'CJXA' && backup.vehicles[0].v.gkb === 'QDT',
     'MKB und GKB stehen in der Sicherung');
+  ok(backup.vehicles[0].v.farbe === 'LC9X Deep Black', 'Der Farbcode steht in der Sicherung');
   const imgKeys = Object.keys(backup.images);
   ok(imgKeys.length === 1 && backup.images[imgKeys[0]].startsWith('data:image/'), 'Bilddaten sind eingebettet');
 
@@ -144,6 +146,7 @@ export default async function ({ browser, base, ok }) {
   ok((await page.textContent('.stats')).includes('04.05.2026 · 120.000 km'), 'Letzter Service wiederhergestellt');
   ok(/MKB \(Motor\)\s*CJXA/.test(await page.textContent('.stats')) && /GKB \(Getriebe\)\s*QDT/.test(await page.textContent('.stats')),
     'MKB und GKB wiederhergestellt');
+  ok(/Farbcode\s*LC9X Deep Black/.test(await page.textContent('.stats')), 'Farbcode wiederhergestellt');
   ok((await page.textContent('.foot')).includes('781'), 'Kosten wiederhergestellt');
   await page.click('[data-a="tab"][data-k="doc"]');
   await page.waitForSelector('.item');
@@ -161,11 +164,12 @@ export default async function ({ browser, base, ok }) {
 
   // --- Sicherung ohne die neuen Felder bleibt lesbar ---
   // Vor Schritt 2 kannte das Format hsn und tsn nicht, vor Schritt 10 nicht
-  // service und serviceKm, vor Fassung 29 nicht mkb und gkb.
+  // service und serviceKm, vor Fassung 29 nicht mkb und gkb, vor Fassung 32
+  // nicht farbe.
   const ohneFelder = JSON.parse(readFileSync(file, 'utf8'));
   for (const fz of ohneFelder.vehicles) {
     delete fz.v.hsn; delete fz.v.tsn; delete fz.v.service; delete fz.v.serviceKm;
-    delete fz.v.mkb; delete fz.v.gkb;
+    delete fz.v.mkb; delete fz.v.gkb; delete fz.v.farbe;
   }
   const ohnePfad = join(tmpdir(), 'sicherung-ohne-schluesselnummern.json');
   writeFileSync(ohnePfad, JSON.stringify(ohneFelder));
@@ -181,6 +185,7 @@ export default async function ({ browser, base, ok }) {
     'Auch ein fehlender Service wird zum Leerwert');
   ok(await page.evaluate(() => VEH[IDX[0]].v.mkb === '' && VEH[IDX[0]].v.gkb === ''),
     'Fehlende MKB und GKB werden zu Leerwerten');
+  ok(await page.evaluate(() => VEH[IDX[0]].v.farbe) === '', 'Ein fehlender Farbcode wird zum Leerwert');
 
   // --- Sicherung aus der Zeit vor der Umbenennung bleibt lesbar ---
   const alt = JSON.parse(readFileSync(file, 'utf8'));

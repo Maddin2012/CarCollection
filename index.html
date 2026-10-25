@@ -98,8 +98,10 @@ button.card{display:block;width:100%;border:0;text-align:left;color:inherit;curs
 .head h2{margin:0;font-family:var(--font);font-size:30px;line-height:1.05;font-weight:700}
 .head p{margin:4px 0 0;color:var(--muted);font-size:14px}
 .stats{margin:16px 18px 0}
-.stat{display:flex;justify-content:space-between;align-items:baseline;padding:11px 0;border-top:1px solid var(--line)}
-.stat span{color:var(--muted);font-size:13px}
+.stat{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+/* Die Beschriftung bricht nie und behält ihren Abstand - ein langer Wert ohne
+   Leerzeichen (Farbcode, Fassung 32) stieß sonst direkt an sie. */
+.stat span{color:var(--muted);font-size:13px;flex:none}
 .stat b{font-family:var(--font);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;text-align:right;min-width:0;overflow-wrap:anywhere}
 /* Die FIN ist 17 Zeichen lang und würde sonst an die Beschriftung stoßen */
 .stat b.long{font-size:15px;letter-spacing:.02em}
@@ -307,10 +309,10 @@ const DOCCATS=['Fahrzeugpapiere','TÜV / HU','Versicherung','Rechnungen','Fotos'
 const LOGTYPES=['Reparatur','Wartung','Umbau','Sonstiges'];
 const STATUS=['Verbaut','Auf Lager','Bestellt'];
 
-const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',mkb:'',gkb:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
+const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',mkb:'',gkb:'',farbe:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='31';
+const APP_VERSION='32';
 let S=null, VEH={}, IDX=[], view='garage';
 // Das Fahrzeug, bei dem das Garagen-Karussell zuletzt stand. Wer ein Fahrzeug
 // öffnet und zurückgeht, landet wieder dort und nicht beim ersten.
@@ -1061,7 +1063,10 @@ function viewCard(){
     // Motor- und Getriebekennbuchstaben: unter diesen Kürzeln führen Werkstatt
     // und Teilehandel Motor und Getriebe (Fassung 29).
     ['MKB (Motor)',v.mkb?esc(v.mkb):dash],
-    ['GKB (Getriebe)',v.gkb?esc(v.gkb):dash]
+    ['GKB (Getriebe)',v.gkb?esc(v.gkb):dash],
+    // Farbcode, frei: nur das Kürzel oder Kürzel und Name (Fassung 32).
+    // "long" wie bei der FIN, damit ein langer Name umbricht statt überzulaufen.
+    ['Farbcode',v.farbe?esc(v.farbe):dash,'long']
   ];
   return `
   <div class="card"><div class="card-in">
@@ -1958,6 +1963,7 @@ function vehicleSheet(isNew){
     // Schlüsselnummern aus der Zulassungsbescheinigung Teil I
     `<div class="two paar">${field('HSN (zu 2.1)','hsn',v.hsn,'text','inputmode="numeric" maxlength="4" placeholder="4 Ziffern"')}${field('TSN (zu 2.2)','tsn',v.tsn,'text','maxlength="3" class="upper" placeholder="3 Zeichen"')}</div>`+
     `<div class="two paar">${field('MKB (Motor)','mkb',v.mkb,'text','maxlength="5" class="upper" autocapitalize="characters" placeholder="z. B. CJXA"')}${field('GKB (Getriebe)','gkb',v.gkb,'text','maxlength="5" class="upper" autocapitalize="characters" placeholder="z. B. QDT"')}</div>`+
+    field('Farbcode','farbe',v.farbe,'text','maxlength="40" placeholder="z. B. LC9X Deep Black"')+
     `<div class="two paar">${field('Letzter Service','service',v.service,'date')}${field('km beim Service','serviceKm',v.serviceKm||'','number','inputmode="numeric"')}</div>
      <p class="dhint">Leer lassen, wenn der Service im Logbuch als Wartung steht – die Karte nimmt ihn von dort. Ein Datum hier ist für einen Service aus der Zeit vor der App; angezeigt wird immer das jüngere von beidem.</p>`+
     `<label>Titelbild</label>
@@ -1970,6 +1976,9 @@ function vehicleSheet(isNew){
       // Buchstaben und Ziffern - es gibt Kennbuchstaben mit Ziffern.
       o.mkb=(o.mkb||'').replace(/\s/g,'').toUpperCase().slice(0,5);
       o.gkb=(o.gkb||'').replace(/\s/g,'').toUpperCase().slice(0,5);
+      // Der Farbcode bleibt, wie er eingetippt wurde - Großschreibung würde den
+      // Farbnamen dahinter verunstalten. Nur die Ränder fallen weg.
+      o.farbe=(o.farbe||'').trim().slice(0,40);
       o.serviceKm=o.serviceKm?Number(o.serviceKm):'';
       // Erst das Bild, dann das Fahrzeug: Scheitert das Ablegen, ist am
       // Fahrzeug noch nichts geändert und die Maske bleibt stehen.

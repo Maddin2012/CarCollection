@@ -75,8 +75,11 @@ button.card{display:block;width:100%;border:0;text-align:left;color:inherit;curs
 .karussell .card-in{position:relative;height:100%}
 .karussell .photo{position:absolute;inset:0;aspect-ratio:auto;align-items:flex-start;padding-top:30%}
 .karussell .photo::after{background:none}
-.karussell .fuss{position:absolute;left:0;right:0;bottom:0;z-index:2;padding-top:64px;background:linear-gradient(rgba(10,14,22,0),rgba(10,14,22,.8) 45%,rgba(10,14,22,.95))}
-.karussell .mini .mh{margin-top:0}
+.karussell .fuss,.arahmen .fuss{position:absolute;left:0;right:0;bottom:0;z-index:2;padding-top:64px;background:linear-gradient(rgba(10,14,22,0),rgba(10,14,22,.8) 45%,rgba(10,14,22,.95))}
+.karussell .mini .mh,.arahmen .mini .mh{margin-top:0}
+/* Im Ausschnitt liegt der Textblock der Garagen-Karte über dem Bild - in
+   deren Maßstab, damit er genauso viel verdeckt (Fassung 34). */
+.arahmen .fuss{pointer-events:none;transform-origin:left bottom;right:auto}
 .alert{margin-bottom:16px;border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:14px;background:var(--surface);overflow:hidden}
 .alert button{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:11px 14px;font-size:14px}
 .alert button:first-child{border-top:0}
@@ -90,6 +93,9 @@ button.card{display:block;width:100%;border:0;text-align:left;color:inherit;curs
    Höhe - etwa zwei Datenzeilen. .mini .photo überschreibt das weiter unten. */
 .photo{position:relative;aspect-ratio:4/3;background:var(--surface2) center/cover no-repeat;display:flex;align-items:center;justify-content:center}
 .photo::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 55%,rgba(19,26,38,.95))}
+/* Mit Titelbild dunkelt der Verlauf nur die Zone unter dem Namen ab - der
+   gewählte Bereich steht darüber und bleibt hell (Fassung 34). */
+#coverBox.mitlage::after{background:linear-gradient(transparent 80%,rgba(19,26,38,.95))}
 .photo .ph{position:relative;z-index:1;color:var(--muted);text-align:center;font-size:13px}
 .plate{position:absolute;z-index:2;left:12px;top:12px;background:#F2F4F8;color:#111;font-family:var(--font);font-weight:700;letter-spacing:.08em;padding:3px 10px 3px 20px;border-radius:6px;font-size:14px;border:1.5px solid #111;background-image:linear-gradient(#1D4FA3,#1D4FA3);background-size:10px 100%;background-repeat:no-repeat}
 /* Gleiches Schild, aber im Textfluss statt über dem Bild */
@@ -274,6 +280,7 @@ input.upper{text-transform:uppercase}
 .astage{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:14px;touch-action:none;overflow:hidden}
 .arahmen{position:relative;flex:none;border-radius:20px;overflow:hidden;background:var(--surface2) center/cover no-repeat;box-shadow:0 0 0 2px var(--foil1);touch-action:none;cursor:grab}
 .avor{flex:none;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}
+.avorbild::after{content:'';position:absolute;left:0;right:0;bottom:0;height:15%;background:linear-gradient(transparent,rgba(19,26,38,.95));pointer-events:none}
 .avorbild{position:relative;width:112px;aspect-ratio:4/3;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--surface2) center/cover no-repeat}
 
 /* Einstellungen */
@@ -328,7 +335,7 @@ const STATUS=['Verbaut','Auf Lager','Bestellt'];
 const newVeh=()=>({id:uid(),v:{name:'',variant:'',plate:'',year:'',power:'',displacement:'',fuel:'',km:0,tuev:'',vin:'',hsn:'',tsn:'',mkb:'',gkb:'',farbe:'',service:'',serviceKm:''},logs:[],parts:[],docs:[],cover:false});
 /* Die ausgelieferte Fassung. Muss mit CACHE in sw.js und mit version.json
    übereinstimmen - die CI prüft das, siehe .github/workflows/checks.yml. */
-const APP_VERSION='33';
+const APP_VERSION='34';
 let S=null, VEH={}, IDX=[], view='garage';
 // Das Fahrzeug, bei dem das Garagen-Karussell zuletzt stand. Wer ein Fahrzeug
 // öffnet und zurückgeht, landet wieder dort und nicht beim ersten.
@@ -769,6 +776,16 @@ function tuevInfo(v=S.v){
   return {c:'ok',t:'gültig',days};
 }
 
+/* Der Textblock unten auf der Garagen-Karte - auch im Ausschnitt gezeigt, damit
+   man dort sieht, was er vom Bild verdeckt. */
+function garageFuss(v){
+  const i=tuevInfo(v);
+  return `<div class="fuss">
+        <div class="mh"><b>${esc(v.name||'Fahrzeug')}</b><span>${esc(v.variant)||'&nbsp;'}</span></div>
+        <div class="ms">${v.plate?`<span class="plate flat">${esc(v.plate)}</span>`:'<span>Kein Kennzeichen</span>'}</div>
+        <div class="ms sub"><span>${v.km?km(v.km):'–'}</span>${i?`<span class="pill ${i.c}">TÜV ${dt(v.tuev)}</span>`:''}</div>
+      </div>`;
+}
 function renderGarage(){
   $('#nav').style.display='none';
   $('#title').textContent='Garage'; $('#sub').textContent=IDX.length?IDX.length+(IDX.length===1?' Fahrzeug':' Fahrzeuge'):'';
@@ -782,14 +799,9 @@ function renderGarage(){
   const due=list.filter(x=>{const i=tuevInfo(x.v);return i&&i.c!=='ok'});
   const banner=due.length?`<div class="alert" role="status">${due.map(x=>{const i=tuevInfo(x.v);return `<button data-a="open" data-id="${x.id}"><b>${esc(x.v.name||'Fahrzeug')}</b>: <span class="${i.c}">TÜV ${i.c==='danger'?'abgelaufen':'fällig'} (${i.t})</span></button>`}).join('')}</div>`:'';
   const cards=list.map(x=>{
-    const i=tuevInfo(x.v);
     return `<button class="card mini" data-a="open" data-id="${x.id}" data-pos="${x.id}"><div class="card-in">
       <div class="photo" data-cover="${x.id}">${x.cover?'':'<div class="ph">Kein Bild</div>'}</div>
-      <div class="fuss">
-        <div class="mh"><b>${esc(x.v.name||'Fahrzeug')}</b><span>${esc(x.v.variant)||'&nbsp;'}</span></div>
-        <div class="ms">${x.v.plate?`<span class="plate flat">${esc(x.v.plate)}</span>`:'<span>Kein Kennzeichen</span>'}</div>
-        <div class="ms sub"><span>${x.v.km?km(x.v.km):'–'}</span>${i?`<span class="pill ${i.c}">TÜV ${dt(x.v.tuev)}</span>`:''}</div>
-      </div>
+      ${garageFuss(x.v)}
     </div></button>`}).join('');
   // Ein Fahrzeug, dessen Datensatz sich nicht lesen ließ, verschweigt die App
   // nicht und streicht es auch nicht. Es steht als Platzhalter da, und seine
@@ -1181,7 +1193,7 @@ async function hydrateImages(){
   }
   if(tab==='card'&&S.cover){
     const d=await loadImg(coverKey(S.id)); const b=$('#coverBox');
-    if(d&&b) bildLage(b,d,S.coverLage,false);
+    if(d&&b) bildLage(b,d,S.coverLage,false,KARTE_UNTEN);
   }
   if(tab==='doc'){
     for(const el of document.querySelectorAll('[data-thumb]')){
@@ -1355,8 +1367,17 @@ function coverLageAktuell(){
    Lage zeigen wie bisher die bildfüllende Mitte. */
 const LAGE0={x:.5,y:.5,z:1};
 const LAGE_ZMAX=4;
+// Kleiner als "ganzes Bild" darf es auch werden - so passt ein hohes Foto
+// ganz über Name und Kennzeichen (Fassung 34).
+const LAGE_KLEIN=.5;
+// Wie weit Lage und Bereich neben dem Foto liegen dürfen (in Fotogrößen). Ein
+// Panorama, klein gezoomt, reicht leicht 30 Fotohöhen weit; die Grenze fängt
+// nur unsinnige Werte aus einer Sicherung ab.
+const LAGE_WEIT=1000;
 const zahl=(v,d)=>typeof v==='number'&&isFinite(v)?v:d;
-const lageNorm=l=>({x:Math.min(1,Math.max(0,zahl(l&&l.x,.5))),y:Math.min(1,Math.max(0,zahl(l&&l.y,.5))),z:Math.max(.01,zahl(l&&l.z,1))});
+// x/y dürfen neben dem Foto liegen: Ist es kleiner als der Rahmen und an den
+// Rand geschoben, steht die Rahmenmitte nicht mehr darauf.
+const lageNorm=l=>istBereich(l)?bereichNorm(l):({x:Math.min(LAGE_WEIT,Math.max(-LAGE_WEIT,zahl(l&&l.x,.5))),y:Math.min(LAGE_WEIT,Math.max(-LAGE_WEIT,zahl(l&&l.y,.5))),z:Math.max(.01,zahl(l&&l.z,1))});
 const BILDMASS=new Map();
 function bildMass(data){
   const k=data.length+':'+data.slice(-80);
@@ -1366,33 +1387,79 @@ function bildMass(data){
   return BILDMASS.get(k);
 }
 /* Bild w×h im Rahmen W×H: Maßstab aus "bildfüllend" mal Zoom, nie kleiner als
-   "ganz sichtbar". Ohne Rand (rand=false, Fahrzeugkarte) nie unter
+   die Hälfte von "ganz sichtbar". Ohne Rand (rand=false, Fahrzeugkarte) nie unter
    bildfüllend. Dann den Bildpunkt in die Mitte und klemmen: Ist das Bild
    größer als der Rahmen, bleibt kein Rand frei; ist es kleiner, steht es
    mittig. */
 function lageRechnen(w,h,W,H,lage,rand){
   const L=lageNorm(lage), cover=Math.max(W/w,H/h), contain=Math.min(W/w,H/h);
   const z=Math.min(LAGE_ZMAX,rand?L.z:Math.max(1,L.z));
-  const s=Math.max(contain,cover*z), dw=w*s, dh=h*s;
+  const s=Math.max(contain*LAGE_KLEIN,cover*z), dw=w*s, dh=h*s;
   let x=W/2-L.x*dw, y=H/2-L.y*dh;
-  x=dw>=W?Math.min(0,Math.max(W-dw,x)):(W-dw)/2;
-  y=dh>=H?Math.min(0,Math.max(H-dh,y)):(H-dh)/2;
+  // Größer als der Rahmen: kein Rand frei. Kleiner: frei verschiebbar, aber
+  // ganz im Rahmen - so lässt sich ein herausgezoomtes Foto z. B. über den
+  // Namen schieben (Fassung 34; vorher stand es dann fest in der Mitte).
+  x=dw>=W?Math.min(0,Math.max(W-dw,x)):Math.min(W-dw,Math.max(0,x));
+  y=dh>=H?Math.min(0,Math.max(H-dh,y)):Math.min(H-dh,Math.max(0,y));
   return {dw,dh,x,y,s,cover,contain};
 }
-function lageAnwenden(el,data,m,lage,rand){
+/* Seit Fassung 34 wird der gewählte Bildbereich gespeichert: {x0,y0,x1,y1},
+   der Teil des Fotos (je 0..1), der im Ausschnitt zu sehen war. Jeder Rahmen
+   zeigt ihn vollständig - hat er ein anderes Format, kommt mehr vom Foto dazu
+   oder der unscharfe Rand, abgeschnitten wird nichts. Vorher galt "Bildpunkt
+   und Zoom", und die Fahrzeugkarte nahm nie weniger als bildfüllend: Ein
+   hochkantes Foto, ganz herausgezoomt, verlor dort unten das Auto. Eine Lage
+   {x,y,z} aus Fassung 33 wird weiter so gezeigt wie bisher. */
+const istBereich=l=>!!l&&typeof l.x0==='number';
+/* Der Bereich ist der Rahmen, auf das Foto umgerechnet - er darf über das Foto
+   hinausreichen (herausgezoomt, mit Rand). So zeigt die Garage das Foto genau
+   an der Stelle im Rahmen, an die es geschoben wurde. Die Fahrzeugkarte hat
+   ein anderes Format und nimmt nur den Fotoinhalt darin (beschnitten=true). */
+function bereichNorm(b,beschnitten){
+  const k=beschnitten?v=>Math.min(1,Math.max(0,zahl(v,0))):v=>Math.min(LAGE_WEIT,Math.max(-LAGE_WEIT,zahl(v,0)));
+  let x0=k(b.x0), y0=k(b.y0), x1=k(b.x1), y1=k(b.y1);
+  if(x1-x0<.001){ x0=0; x1=1; } if(y1-y0<.001){ y0=0; y1=1; }
+  return {x0,y0,x1,y1};
+}
+/* Eine Achse platzieren: den Bereich [a0,a1] mittig in die freie Zone [c0,c1]
+   setzen, dann so schieben, dass das Foto den Rahmen füllt (bzw. ganz darin
+   bleibt) - aber nie so weit, dass der Bereich die freie Zone verlässt. */
+function platzieren(len,d,a0,a1,c0,c1){
+  const ziel=(c0+c1)/2-(a0+a1)/2*d;
+  const fLo=d>=len?len-d:0, fHi=d>=len?0:len-d;
+  const sLo=c0-a0*d, sHi=c1-a1*d;
+  let lo=Math.max(fLo,sLo), hi=Math.min(fHi,sHi);
+  if(lo>hi){ lo=sLo; hi=sHi; }
+  return Math.min(hi,Math.max(lo,ziel));
+}
+/* unten: Anteil des Rahmens, über dem etwas liegt (auf der Fahrzeugkarte der
+   Name). Der Bereich kommt ganz in den freien Teil darüber. */
+function bereichRechnen(w,h,W,H,b,unten=0,beschnitten=false){
+  const B=bereichNorm(b,beschnitten), rw=(B.x1-B.x0)*w, rh=(B.y1-B.y0)*h, frei=H*(1-unten);
+  const s=Math.min(W/rw,frei/rh), dw=w*s, dh=h*s;
+  const x=platzieren(W,dw,B.x0,B.x1,0,W), y=platzieren(H,dh,B.y0,B.y1,0,frei);
+  return {dw,dh,x,y,s,cover:Math.max(W/w,H/h),contain:Math.min(W/w,H/h)};
+}
+const lageGeo=(w,h,W,H,lage,rand,unten)=>istBereich(lage)?bereichRechnen(w,h,W,H,lage,unten,!rand):lageRechnen(w,h,W,H,lage,rand);
+// Auf der Fahrzeugkarte liegt unten der Name über dem Bild (.head mit
+// negativem Rand, dazu der Verlauf) - gemessen rund 15 % der Bildhöhe.
+const KARTE_UNTEN=.15;
+// Der sichtbare Teil des Fotos in einem Rahmen - das ist der Bereich.
+const bereichAus=(g,W,H)=>bereichNorm({x0:-g.x/g.dw,y0:-g.y/g.dh,x1:(W-g.x)/g.dw,y1:(H-g.y)/g.dh},false);
+function lageAnwenden(el,data,m,lage,rand,unten=0){
   const W=el.clientWidth, H=el.clientHeight; if(!W||!H||!m.w||!m.h) return null;
   let L=el.querySelector(':scope>.bildlage');
   if(!L){ L=document.createElement('i'); L.className='bildlage'; el.prepend(L); }
-  const g=lageRechnen(m.w,m.h,W,H,lage,rand);
+  const g=lageGeo(m.w,m.h,W,H,lage,rand,unten);
   el.style.backgroundImage=`url(${data})`; el.classList.add('mitlage');
   if(L.dataset.quelle!==data.slice(-80)){ L.style.backgroundImage=`url(${data})`; L.dataset.quelle=data.slice(-80); }
   L.style.backgroundSize=`${g.dw}px ${g.dh}px`;
   L.style.backgroundPosition=`${g.x}px ${g.y}px`;
   return g;
 }
-async function bildLage(el,data,lage,rand){
+async function bildLage(el,data,lage,rand,unten=0){
   if(!el||!data) return null;
-  try{ return lageAnwenden(el,data,await bildMass(data),lage,rand); }catch(e){ return null; }
+  try{ return lageAnwenden(el,data,await bildMass(data),lage,rand,unten); }catch(e){ return null; }
 }
 function lageWeg(el){
   if(!el) return;
@@ -1414,16 +1481,29 @@ function ausRahmenMass(){
 async function openAus(data,lage,fertig){
   let m; try{ m=await bildMass(data); }catch(e){ return showErr('Das Bild konnte nicht geladen werden.'); }
   pushModal('aus');
-  AS={data,m,lage:lageNorm(lage),fertig,zeiger:new Map(),start:null};
+  AS={data,m,lage:istBereich(lage)?{...LAGE0}:lageNorm(lage),fertig,zeiger:new Map(),start:null};
   document.body.classList.add('noscroll');
   const l=$('#ausschnitt'); l.hidden=false;
   l.innerHTML=`<div class="ebar"><button class="btn ghost" data-a="ausZu">Abbrechen</button>
       <div class="et"><b>Ausschnitt</b><span>Ziehen verschiebt · zwei Finger zoomen</span></div>
       <button class="btn primary" data-a="ausOk">Übernehmen</button></div>
-    <div class="astage" id="aStage"><div class="arahmen" id="aRahmen"></div>
+    <div class="astage" id="aStage"><div class="arahmen" id="aRahmen"><div class="mini">${garageFuss(ausFahrzeug())}</div></div>
       <div class="avor"><div class="avorbild" id="aVor"></div><span>So steht es<br>auf der Fahrzeugkarte</span></div></div>
     <div class="etools"><button class="btn" data-a="ausReset">Zurücksetzen</button></div>`;
-  ausPassen(); ausZeichnen();
+  ausPassen();
+  // Ein gespeicherter Bereich wird im Rahmen genau so gezeigt wie in der
+  // Garage; daraus ergibt sich die Ausgangslage zum Weiterschieben.
+  if(istBereich(lage)){
+    const r=$('#aRahmen'), W=r.clientWidth, H=r.clientHeight, g=bereichRechnen(m.w,m.h,W,H,lage);
+    AS.lage={x:(W/2-g.x)/g.dw,y:(H/2-g.y)/g.dh,z:g.s/g.cover};
+  }
+  ausZeichnen();
+}
+// Was gerade in der Maske steht - Name, Kennzeichen, km, TÜV -, für den
+// Textblock im Ausschnitt.
+function ausFahrzeug(){
+  try{ const o=normMonth(vals(),'tuev'); return {...(VEH[pendingCover&&pendingCover.id]||newVeh()).v,...o}; }
+  catch(e){ return {name:''}; }
 }
 function closeAus(){
   const l=$('#ausschnitt'); if(!l) return;
@@ -1438,19 +1518,23 @@ function ausPassen(){
   const bw=st.clientWidth-28, bh=st.clientHeight-28-12-(v?v.offsetHeight:0);
   const h=Math.max(80,Math.min(bh,bw/q));
   r.style.width=Math.round(h*q)+'px'; r.style.height=Math.round(h)+'px';
+  // Den Textblock im Maßstab der echten Garagen-Karte zeigen.
+  const f=r.querySelector('.fuss');
+  if(f){ const k=Math.round(h*q)/gm.w; f.style.width=(gm.w)+'px'; f.style.transform=`scale(${k})`; }
 }
 const ausGeo=()=>{ const r=$('#aRahmen'); return lageRechnen(AS.m.w,AS.m.h,r.clientWidth,r.clientHeight,AS.lage,true); };
 function ausZeichnen(){
   if(!AS) return;
-  lageAnwenden($('#aRahmen'),AS.data,AS.m,AS.lage,true);
-  lageAnwenden($('#aVor'),AS.data,AS.m,AS.lage,false);
+  const g=lageAnwenden($('#aRahmen'),AS.data,AS.m,AS.lage,true), r=$('#aRahmen');
+  // Die Vorschau zeigt, was die Fahrzeugkarte aus dem gewählten Bereich macht.
+  if(g) lageAnwenden($('#aVor'),AS.data,AS.m,bereichAus(g,r.clientWidth,r.clientHeight),false,KARTE_UNTEN);
 }
 // Bild links oben bei (x, y), Maßstab s - daraus die Lage, geklemmt und so
 // zurückgerechnet, dass die gespeicherte Lage genau das Gezeigte beschreibt.
 function ausSetze(x,y,s){
   const r=$('#aRahmen'), W=r.clientWidth, H=r.clientHeight, w=AS.m.w, h=AS.m.h;
   const cover=Math.max(W/w,H/h), contain=Math.min(W/w,H/h);
-  s=Math.min(cover*LAGE_ZMAX,Math.max(contain,s));
+  s=Math.min(cover*LAGE_ZMAX,Math.max(contain*LAGE_KLEIN,s));
   const g=lageRechnen(w,h,W,H,{x:(W/2-x)/(w*s),y:(H/2-y)/(h*s),z:s/cover},true);
   AS.lage={x:(W/2-g.x)/g.dw,y:(H/2-g.y)/g.dh,z:g.s/cover};
 }
@@ -2223,7 +2307,11 @@ const A={
     const bild=pendingCover.data||(!pendingCover.weg&&IMG[coverKey(pendingCover.id)]); if(!bild) return;
     openAus(bild,coverLageAktuell(),l=>{ if(pendingCover){ pendingCover.lage=l; renderCoverBox(); } });
   },
-  ausOk:()=>{ if(!AS) return; const f=AS.fertig, l={...AS.lage}; dismissModal(); if(f) f(l); },
+  ausOk:()=>{
+    if(!AS) return;
+    const r=$('#aRahmen'), f=AS.fertig, b=bereichAus(ausGeo(),r.clientWidth,r.clientHeight);
+    dismissModal(); if(f) f(b);
+  },
   ausZu:()=>dismissModal(),
   ausReset:()=>{ if(!AS) return; AS.lage={...LAGE0}; ausZeichnen(); },
 

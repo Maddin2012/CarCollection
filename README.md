@@ -143,12 +143,23 @@ verkehrt.
 **Den Ausschnitt** stellst du direkt nach der Auswahl ein, später jederzeit über
 *Ausschnitt anpassen* in derselben Maske: Mit einem Finger verschieben, mit zwei
 Fingern zoomen (der Punkt zwischen den Fingern bleibt stehen), am Rechner mit
-dem Mausrad. Eingestellt wird im hohen Rahmen der Garagen-Karte, darunter steht
-die Vorschau für den 4:3-Rahmen der Fahrzeugkarte – beide nehmen denselben
-Bildpunkt als Mitte. Herauszoomen geht bis zum ganzen Bild; der freie Rand zeigt
-dann eine unscharfe, abgedunkelte Kopie. Das Foto selbst bleibt dabei
-unverändert gespeichert, am Fahrzeug liegt nur die Lage (`coverLage`: Bildpunkt
-und Zoom). Fahrzeuge ohne Lage zeigen wie bisher die bildfüllende Mitte.
+dem Mausrad. Eingestellt wird im hohen Rahmen der Garagen-Karte, mit Name,
+Kennzeichen, km und TÜV darüber, genau wie sie in der Garage liegen – **so, wie
+der Rahmen aussieht, steht das Bild nachher in der Garage**. Herauszoomen geht
+bis zur Hälfte des ganzen Bildes; ein kleineres Foto lässt sich frei im Rahmen
+verschieben, etwa ganz nach oben über den Namen. Der freie Rand zeigt eine
+unscharfe, abgedunkelte Kopie.
+
+Darunter steht die Vorschau der Fahrzeugkarte. Sie hat ein anderes Format
+(4:3) und zeigt den gewählten Teil des Fotos vollständig im Bereich über dem
+Namen; was daneben frei bleibt, füllt wieder der unscharfe Rand. Abgeschnitten
+wird dort nichts von dem, was im Rahmen zu sehen war.
+
+Das Foto selbst bleibt dabei unverändert gespeichert, am Fahrzeug liegt nur der
+gewählte Bereich (`coverLage` mit `x0, y0, x1, y1`: der Rahmen, auf das Foto
+umgerechnet). Eine Lage aus Fassung 33 (`x, y, z`: Bildpunkt und Zoom) wird
+weiter so gezeigt wie damals; Fahrzeuge ohne Lage zeigen wie bisher die
+bildfüllende Mitte.
 
 ## Ansehen und ändern — überall derselbe Weg
 
@@ -459,7 +470,7 @@ die App:
 | `vorspann` | Vorspann beim Öffnen: steht ab Seitenstart, fängt Tipps ab, verzögert den Start der App nicht, nach 3 Sekunden ganz weg; die übrigen Reihen schalten ihn ab |
 | `installationskarte` | QR-Code der Karte in `karte/` führt auf die Adresse aus `CLAUDE.md`; PDF mit einer Seite; die Verweise der README gehen nicht ins Leere |
 | `garage` | Karussell der Garage: Karten nebeneinander, im Hochformat und bis unten, Bild füllt die Karte, Höhe folgt dem Fenster, Nachbar lugt herein, Einrasten nach einer Scroll-Geste, Punkte, gemerkte Stelle nach Öffnen und Zurück, Plus oben, Platzhalter, ein Fahrzeug, leere Garage. Touch-Gesten kommen im Testbrowser nicht an – geprüft ist das Scrollen, nicht der Finger |
-| `titelbild` | Ausschnitt des Titelbilds: öffnet nach der Auswahl, Ziehen mit Klemmen, zwei Finger mit stehendem Anker, ganz heraus mit unscharfem Rand, Lage in Garage und Fahrzeugkarte, nachträglich ohne das Bild neu zu schreiben, Zurück-Geste, Abbrechen, ältere Fahrzeuge, Sicherung, 360 px |
+| `titelbild` | Ausschnitt des Titelbilds: öffnet nach der Auswahl, Ziehen mit Klemmen, zwei Finger mit stehendem Anker, ganz heraus mit unscharfem Rand, gespeicherter Bereich gleich dem gewählten, Garage zeigt ihn an derselben Stelle, Fahrzeugkarte ganz über dem Namen, Hochkant-Foto verkleinert über den Namen geschoben, Panorama und hohe Streifen rechnerisch, Name und Kennzeichen im Ausschnitt, Lage aus Fassung 33, nachträglich ohne das Bild neu zu schreiben, Zurück-Geste, Abbrechen, ältere Fahrzeuge, Sicherung, 360 px |
 
 Die Plattform-Reihe ersetzt **keinen** Test auf echter Apple-Hardware. Belegt
 ist damit, dass die Weichen greifen — nicht, dass Safari sich dahinter

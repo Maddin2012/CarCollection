@@ -82,6 +82,58 @@ export default async function ({ browser, base, ok }) {
   });
   ok(kbPaar.paar && kbPaar.nebeneinander && kbPaar.ueberlauf <= 0,
     `MKB und GKB stehen bei 360 px als Paar nebeneinander (Überlauf ${kbPaar.ueberlauf} px)`);
+
+  // --- Längere Werte (Fassung 37) ---
+  // Gemeldet am Pixel: In die TSN passten nur 3 Zeichen. Feld 2.2 im
+  // Fahrzeugschein trägt aber TSN, Prüfziffer und Variante/Version. Und ein
+  // BMW-Motorcode wie "M20B25" hat 6 Zeichen, MKB nahm nur 5. Getippt wird
+  // Zeichen für Zeichen, damit die Grenze des Feldes greift wie beim Nutzer.
+  const tippen = async (feld, text) => { await page.fill(`[name="${feld}"]`, ''); await page.locator(`[name="${feld}"]`).pressSequentially(text); };
+  await tippen('tsn', 'ane 0000014 abcdef');
+  const tsnLang = await page.inputValue('[name="tsn"]');
+  ok(tsnLang.length === 15, `Die TSN nimmt 15 Zeichen auf, nicht mehr (${JSON.stringify(tsnLang)})`);
+  await tippen('mkb', 'm20b25abcdefgh');
+  const mkbLang = await page.inputValue('[name="mkb"]');
+  ok(mkbLang.length === 12, `MKB nimmt 12 Zeichen auf, nicht mehr (${JSON.stringify(mkbLang)})`);
+  await tippen('gkb', 'getrag260abcdef');
+  ok((await page.inputValue('[name="gkb"]')).length === 12, 'GKB nimmt 12 Zeichen auf, nicht mehr');
+  const langPaar = await page.evaluate(() => {
+    const p = document.querySelector('#sheet .panel'), t = document.querySelector('[name="tsn"]'), h = document.querySelector('[name="hsn"]');
+    const a = h.getBoundingClientRect(), b = t.getBoundingClientRect();
+    return { ueberlauf: p.scrollWidth - p.clientWidth, nebeneinander: Math.abs(a.top - b.top) < 1 && a.right <= b.left && b.right <= p.getBoundingClientRect().right };
+  });
+  ok(langPaar.nebeneinander && langPaar.ueberlauf <= 0,
+    `Mit vollen Werten stehen HSN und TSN bei 360 px weiter nebeneinander (Überlauf ${langPaar.ueberlauf} px)`);
+  await tippen('tsn', 'ane  0000014 ');
+  await tippen('mkb', 'm20 b25');
+  await tippen('gkb', 'getrag 260');
+  await page.click('[data-a="ok"]');
+  await page.waitForFunction(() => !document.getElementById('sheet').classList.contains('open'));
+  const lang = await page.evaluate(() => ({ t: VEH[IDX[0]].v.tsn, m: VEH[IDX[0]].v.mkb, g: VEH[IDX[0]].v.gkb }));
+  ok(lang.t === 'ANE 0000014', `Die ganze Zeile aus Feld 2.2 wird gespeichert, groß, Leerzeichen bereinigt (${JSON.stringify(lang.t)})`);
+  ok(lang.m === 'M20B25' && lang.g === 'GETRAG260', `M20B25 passt ganz in MKB (${lang.m} / ${lang.g})`);
+  const karteLang = (await page.textContent('.stats')).replace(/\s+/g, ' ');
+  ok(/TSN \(zu 2\.2\)\s*ANE 0000014/.test(karteLang) && /MKB \(Motor\)\s*M20B25/.test(karteLang),
+    'Die Karte zeigt die langen Werte');
+  const karteUeber = await page.evaluate(() => [...document.querySelectorAll('.stats .stat')]
+    .map(st => { const b = st.querySelector('b'); return Math.max(st.scrollWidth - st.clientWidth, b.getBoundingClientRect().right - st.getBoundingClientRect().right); })
+    .reduce((x, y) => Math.max(x, y), 0));
+  ok(karteUeber <= 0.5, `Bei 360 px läuft keine Zeile der Karte über (${karteUeber.toFixed(1)} px)`);
+  // Übergelaufen wäre ohnehin nichts (die Zeile bricht um). Volle, echte
+  // Werte stehen bei 360 px aber auch in der großen Schrift auf einer Zeile -
+  // geprüft mit der ganzen Zeile aus Feld 2.2 und zwei 12-Zeichen-Codes. Der
+  // künstliche Grenzfall 12 × W bricht um; übergelaufen ist auch dann nichts.
+  const zeilenhoehe = await page.evaluate(() => {
+    const alt = { ...S.v }; S.v.tsn = 'ANE 0000014'; S.v.mkb = 'M54B30TU2DE1'; S.v.gkb = 'GETRAG260ZFA'; render();
+    const h = [...document.querySelectorAll('.stats .stat')].filter(st => /TSN|MKB|GKB/.test(st.textContent))
+      .map(st => { const b = st.querySelector('b'); return b.getBoundingClientRect().height / parseFloat(getComputedStyle(b).lineHeight || 0 || 1); });
+    S.v = alt; render();
+    return h;
+  });
+  ok(zeilenhoehe.length === 3 && zeilenhoehe.every(z => z < 1.5),
+    `Volle TSN, MKB und GKB stehen bei 360 px je auf einer Zeile (${zeilenhoehe.map(z => z.toFixed(2)).join(' / ')} Zeilen)`);
+  await page.click('[data-a="editVehicle"]');
+  ok(await page.inputValue('[name="tsn"]') === 'ANE 0000014', 'Beim Bearbeiten steht die ganze TSN-Zeile wieder drin');
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.click('.panel .row [data-a="close"]');
 

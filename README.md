@@ -40,8 +40,10 @@ auch dieser Text bleibt bei den gewachsenen Namen.
   Fahrzeugs führt Zurück wieder zu ihm. Neue Fahrzeuge über das Plus oben neben
   dem Zahnrad. Darüber das Warnbanner für abgelaufenen oder bald fälligen TÜV.
 - **Fahrzeugkarte** – Titelbild, Kilometerstand, Baujahr, TÜV-Datum, letzter
-  Service, FIN, HSN, TSN, MKB und GKB (Motor- und Getriebekennbuchstaben),
-  der Farbcode (frei, z. B. „LC9X Deep Black") sowie eine Kostenübersicht. Die übrigen Felder (Leistung, Hubraum, Kraftstoff)
+  Service, FIN, HSN (4 Ziffern aus Feld 2.1), TSN (Feld 2.2 komplett: TSN,
+  Prüfziffer und Variante/Version, bis 15 Zeichen, z. B. „ANE 0000014"), MKB
+  und GKB (Motor- und Getriebekennbuchstaben, je bis 12 Zeichen, z. B.
+  „M20B25"), der Farbcode (frei, z. B. „LC9X Deep Black") sowie eine Kostenübersicht. Die übrigen Felder (Leistung, Hubraum, Kraftstoff)
   bleiben in der Bearbeiten-Maske erfassbar.
 - **Vorspann** – beim Öffnen stehen drei Sekunden lang die Bildmarke und der
   Name auf dunklem Grund. Die App lädt darunter schon; abkürzen lässt er sich
